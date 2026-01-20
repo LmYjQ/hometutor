@@ -1,0 +1,25 @@
+{
+  "pages": [
+    "pages/login/index",
+    "pages/index/index",
+    "pages/example/index",
+    "pages/testFFmpeg/index",
+    "pages/teacherHome/index",
+    "pages/studentHome/index",
+    "pages/joinClass/index",
+    "pages/classDetail/index",
+    "pages/recitation/index",
+    "pages/submissionResult/index",
+    "pages/myProfile/index"
+  ],
+  "window": {
+    "backgroundColor": "#F6F6F6",
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#F6F6F6",
+    "navigationBarTitleText": "云开发 QuickStart",
+    "navigationBarTextStyle": "black"
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}

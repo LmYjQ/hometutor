@@ -1,0 +1,23 @@
+<view class="container">
+  <view class="logo-section">
+    <view class="logo"></view>
+    <text class="app-name">智能背诵助手</text>
+    <text class="app-desc">AI 帮你检查背诵作业</text>
+  </view>
+
+  <view class="login-section">
+    <button class="role-btn teacher" bindtap="loginAsTeacher">
+      <text class="role-icon">👨‍🏫</text>
+      <text class="role-text">我是老师</text>
+    </button>
+
+    <button class="role-btn student" bindtap="loginAsStudent">
+      <text class="role-icon">👨‍🎓</text>
+      <text class="role-text">我是学生</text>
+    </button>
+  </view>
+
+  <view class="info-section">
+    <text class="info-text">选择您的身份后即可开始使用</text>
+  </view>
+</view>

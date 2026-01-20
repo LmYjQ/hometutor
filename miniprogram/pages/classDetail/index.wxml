@@ -1,0 +1,31 @@
+<view class="container">
+  <view class="class-header">
+    <view class="class-name">{{classInfo.name}}</view>
+    <view class="class-meta">
+      <text class="invite-code">邀请码: {{classInfo.invite_code}}</text>
+      <text class="student-count">{{classInfo.student_ids.length}} 名学生</text>
+    </view>
+    <button class="copy-btn" bindtap="copyInviteCode">复制邀请码</button>
+  </view>
+
+  <view class="section-title">作业历史</view>
+
+  <view class="assignment-list" wx:if="{{assignments.length > 0}}">
+    <view class="assignment-card" wx:for="{{assignments}}" wx:key="_id" bindtap="goToAssignmentDetail" data-id="{{item._id}}">
+      <view class="assignment-header">
+        <text class="question-title">{{item.question_title}}</text>
+        <text class="status" style="color: {{item.status === 'active' ? '#13c2c2' : '#999'}}">{{item.statusText}}</text>
+      </view>
+      <view class="assignment-meta">
+        <text class="deadline">截止: {{item.deadlineText}}</text>
+        <text class="stats">{{item.submissionCount}} 人已提交</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty-state" wx:else>
+    <text class="empty-icon">📋</text>
+    <text class="empty-text">还没有布置作业</text>
+    <text class="empty-desc">请在后台管理系统发布作业</text>
+  </view>
+</view>

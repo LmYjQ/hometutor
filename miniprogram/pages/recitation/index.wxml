@@ -1,0 +1,95 @@
+<view class="container">
+  <!-- 作业信息 -->
+  <view class="assignment-info">
+    <view class="class-tag">{{assignment.class_name}}</view>
+    <view class="question">{{assignment.question_title}}</view>
+    <view class="deadline">截止时间: {{assignment.deadlineText}}</view>
+  </view>
+
+  <!-- 参考文本 -->
+  <view class="reference-section" wx:if="{{assignment.reference_text}}">
+    <view class="section-title">参考文本</view>
+    <view class="reference-text">{{assignment.reference_text}}</view>
+  </view>
+
+  <!-- 录制区域 -->
+  <view class="record-section">
+    <view class="camera-preview" wx:if="{{isRecording || videoPath}}">
+      <video
+        class="video-preview"
+        src="{{videoPath}}"
+        wx:if="{{videoPath}}"
+        controls
+      ></video>
+      <camera
+        wx:if="{{!videoPath}}"
+        device-position="back"
+        flash="off"
+        binderror="onCameraError"
+        style="width: 100%; height: 400rpx; border-radius: 16rpx;"
+      ></camera>
+    </view>
+
+    <view class="record-placeholder" wx:else bindtap="startRecord">
+      <text class="placeholder-icon">🎥</text>
+      <text class="placeholder-text">点击开始录制</text>
+      <text class="placeholder-hint">建议录制15-60秒</text>
+    </view>
+
+    <!-- 录制控制 -->
+    <view class="record-controls" wx:if="{{!videoPath}}">
+      <button
+        class="record-btn {{isRecording ? 'recording' : ''}}"
+        bindtap="toggleRecord"
+      >
+        <text class="record-icon">{{isRecording ? '⏹' : '⏺'}}</text>
+        <text class="record-time" wx:if="{{isRecording}}">{{recordTime}}s</text>
+      </button>
+    </view>
+
+    <!-- 重新录制 -->
+    <view class="re-record" wx:if="{{videoPath}}">
+      <button class="re-record-btn" bindtap="reRecord">重新录制</button>
+    </view>
+  </view>
+
+  <!-- 上传和提交 -->
+  <view class="submit-section" wx:if="{{videoPath}}">
+    <view class="video-info">
+      <text class="info-text">视频已准备好</text>
+      <text class="file-size">大小: {{fileSizeText}}</text>
+    </view>
+
+    <button
+      class="submit-btn"
+      bindtap="submitRecitation"
+      loading="{{uploading || analyzing}}"
+      disabled="{{uploading || analyzing}}"
+    >
+      <text wx:if="{{!uploading && !analyzing}}">提交背诵</text>
+      <text wx:if="{{uploading}}">上传中...</text>
+      <text wx:if="{{analyzing}}">AI评分中...</text>
+    </button>
+
+    <view class="progress-section" wx:if="{{analyzing}}">
+      <progress percent="{{progress}}" stroke-width="6" activeColor="#667eea" backgroundColor="#f0f0f0" active />
+      <text class="progress-text">{{progressText}}</text>
+    </view>
+  </view>
+
+  <!-- 历史提交记录 -->
+  <view class="history-section" wx:if="{{historySubmissions.length > 0}}">
+    <view class="section-title">历史提交</view>
+    <view class="history-list">
+      <view class="history-item" wx:for="{{historySubmissions}}" wx:key="_id" bindtap="viewResult" data-id="{{item._id}}">
+        <view class="history-time">{{item.created_atText}}</view>
+        <view class="history-score">
+          <text class="score">{{item.score}}分</text>
+        </view>
+        <view class="history-status {{item.status}}">
+          {{item.status === 'graded' ? '已评分' : '评分中'}}
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

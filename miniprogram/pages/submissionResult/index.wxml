@@ -1,0 +1,81 @@
+<view class="container">
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">
+    <view class="loading-spinner"></view>
+    <text class="loading-text">正在获取评分结果...</text>
+  </view>
+
+  <!-- 评分结果 -->
+  <view class="result" wx:if="{{!loading && submission}}">
+    <!-- 分数卡片 -->
+    <view class="score-card">
+      <view class="score-ring">
+        <view class="score-value" style="color: {{scoreColor}}">{{submission.score}}</view>
+        <view class="score-unit">分</view>
+      </view>
+      <view class="score-label">AI智能评分</view>
+    </view>
+
+    <!-- 作业信息 -->
+    <view class="assignment-info">
+      <view class="class-tag">{{submission.class_name}}</view>
+      <view class="question">{{submission.question_title}}</view>
+    </view>
+
+    <!-- 评价内容 -->
+    <view class="evaluation-section">
+      <view class="section-title">AI评价</view>
+
+      <!-- 遗漏点 -->
+      <view class="missing-points" wx:if="{{submission.evaluation.missing_points && submission.evaluation.missing_points.length > 0}}">
+        <view class="point-header">
+          <text class="point-icon">❌</text>
+          <text class="point-title">可能遗漏的内容</text>
+        </view>
+        <view class="point-list">
+          <view class="point-item" wx:for="{{submission.evaluation.missing_points}}" wx:key="index">
+            <text class="point-num">{{index + 1}}.</text>
+            <text class="point-text">{{item}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 评语 -->
+      <view class="comment" wx:if="{{submission.evaluation.comment}}">
+        <view class="comment-header">
+          <text class="comment-icon">💬</text>
+          <text class="comment-title">综合评语</text>
+        </view>
+        <view class="comment-text">{{submission.evaluation.comment}}</view>
+      </view>
+    </view>
+
+    <!-- 原文对照 -->
+    <view class="text-comparison">
+      <view class="section-title">原文对照</view>
+
+      <view class="text-section">
+        <view class="text-label">背诵识别结果：</view>
+        <view class="text-content">{{submission.audio_text || '未能识别到语音'}}</view>
+      </view>
+
+      <view class="text-section" wx:if="{{submission.reference_text}}">
+        <view class="text-label">标准答案：</view>
+        <view class="text-content">{{submission.reference_text}}</view>
+      </view>
+    </view>
+
+    <!-- 操作按钮 -->
+    <view class="actions">
+      <button class="action-btn primary" bindtap="goToRecitation">再练一次</button>
+      <button class="action-btn secondary" bindtap="goBack">返回作业列表</button>
+    </view>
+  </view>
+
+  <!-- 错误状态 -->
+  <view class="error" wx:if="{{!loading && error}}">
+    <text class="error-icon">⚠️</text>
+    <text class="error-text">{{error}}</text>
+    <button class="retry-btn" bindtap="loadResult">重新加载</button>
+  </view>
+</view>

@@ -1,0 +1,55 @@
+<view class="container">
+  <view class="header">
+    <view class="user-info">
+      <image class="avatar" src="{{userInfo.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
+      <view class="info">
+        <text class="name">{{userInfo.name}}</text>
+        <text class="role">老师</text>
+      </view>
+    </view>
+    <view class="stats">
+      <view class="stat-item">
+        <text class="num">{{classCount}}</text>
+        <text class="label">班级数</text>
+      </view>
+      <view class="stat-item">
+        <text class="num">{{studentCount}}</text>
+        <text class="label">学生数</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-title">我的班级</view>
+
+  <view class="class-list" wx:if="{{classes.length > 0}}">
+    <view class="class-card" wx:for="{{classes}}" wx:key="_id" bindtap="goToClassDetail" data-id="{{item._id}}">
+      <view class="class-name">{{item.name}}</view>
+      <view class="class-info">
+        <text class="student-count">{{item.student_ids.length}} 名学生</text>
+        <text class="invite-code">邀请码: {{item.invite_code}}</text>
+      </view>
+      <view class="arrow">></view>
+    </view>
+  </view>
+
+  <view class="empty-state" wx:else>
+    <text class="empty-icon">📚</text>
+    <text class="empty-text">还没有班级</text>
+    <text class="empty-desc">创建第一个班级开始使用</text>
+  </view>
+
+  <view class="bottom-actions">
+    <button class="create-btn" bindtap="showCreateClassModal">+ 创建班级</button>
+  </view>
+
+  <!-- 创建班级弹窗 -->
+  <view class="modal-mask" wx:if="{{showModal}}" bindtap="hideModal"></view>
+  <view class="modal" wx:if="{{showModal}}">
+    <view class="modal-title">创建班级</view>
+    <input class="modal-input" placeholder="请输入班级名称" placeholder-class="placeholder" bindinput="onClassNameInput"/>
+    <view class="modal-actions">
+      <button class="cancel-btn" bindtap="hideModal">取消</button>
+      <button class="confirm-btn" bindtap="createClass" loading="{{creating}}">创建</button>
+    </view>
+  </view>
+</view>

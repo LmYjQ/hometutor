@@ -1,0 +1,44 @@
+<view class="container">
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 作业信息 -->
+  <view class="assignment-header" wx:if="{{assignment}}">
+    <view class="class-tag">{{assignment.class_name}}</view>
+    <view class="question">{{assignment.question_title}}</view>
+    <view class="meta">
+      <text class="deadline">截止: {{assignment.deadlineText}}</text>
+      <text class="stats">{{submittedCount}}/{{studentCount}} 人已提交</text>
+    </view>
+  </view>
+
+  <!-- 提交列表 -->
+  <view class="submissions-section" wx:if="{{!loading && submissions.length > 0}}">
+    <view class="section-title">学生提交 ({{submissions.length}})</view>
+    <view class="submission-list">
+      <view class="submission-card" wx:for="{{submissions}}" wx:key="_id" bindtap="viewSubmission" data-id="{{item._id}}">
+        <view class="student-info">
+          <image class="avatar" src="{{item.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
+          <view class="info">
+            <text class="name">{{item.student_name}}</text>
+            <text class="time">{{item.created_atText}}</text>
+          </view>
+        </view>
+        <view class="score-info">
+          <view class="score {{item.score >= 80 ? 'good' : item.score >= 60 ? 'medium' : 'bad'}}">
+            {{item.score}}分
+          </view>
+          <text class="status {{item.status}}">{{item.statusText}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty" wx:if="{{!loading && submissions.length === 0}}">
+    <text class="empty-icon">📭</text>
+    <text class="empty-text">暂时还没有学生提交</text>
+  </view>
+</view>

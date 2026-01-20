@@ -1,0 +1,148 @@
+<!-- ==================== LLM 评分常量定义 ====================
+  参考 run.py:83-119 (step_3_evaluate) 和 speechRecognition 云函数
+  云函数名称: llmScoring
+  LLM 模型: deepseek-ai/DeepSeek-V3
+  API: https://api.siliconflow.cn/v1/chat/completions
+-->
+<view class="container">
+  <!-- Tab 切换 -->
+  <view class="tabs">
+    <!-- <view class="tab {{tab === 0 ? 'active' : ''}}" bindtap="switchTab" data-tab="0">
+      云函数 ffmpeg
+    </view> -->
+    <view class="tab {{tab === 1 ? 'active' : ''}}" bindtap="switchTab" data-tab="1">
+      前端 MediaContainer
+    </view>
+  </view>
+
+  <!-- Tab 0: 云函数 ffmpeg 方案 -->
+  <!-- <view wx:if="{{tab === 0}}" class="tab-content">
+    <view class="section">
+      <view class="section-title">云函数 ffmpeg 方案</view>
+      <view class="desc">在云端使用打包的 ffmpeg 可执行文件处理</view>
+      <button bindtap="testFFmpeg" loading="{{loading}}" type="primary" class="main-btn">
+        测试云函数 ffmpeg
+      </button>
+    </view>
+
+    <view wx:if="{{result}}" class="result-box">
+      <view class="result-title">测试结果</view>
+      <view class="result-row">
+        <text class="label">ffmpeg.wasm:</text>
+        <text class="value {{result.ffmpegWasmTest.success ? 'success' : 'error'}}">
+          {{result.ffmpegWasmTest.success ? '成功' : '失败'}}
+        </text>
+      </view>
+      <view class="result-row">
+        <text class="label">系统 ffmpeg:</text>
+        <text class="value {{result.systemFFmpegTest.success ? 'success' : 'error'}}">
+          {{result.systemFFmpegTest.success ? '可用' : '不可用'}}
+        </text>
+      </view>
+      <view class="suggestion">
+        {{result.suggestion.recommended}}
+      </view>
+    </view>
+  </view> -->
+
+  <!-- Tab 1: 前端 MediaContainer 方案 -->
+  <view wx:if="{{tab === 1}}" class="tab-content">
+    <view class="section">
+      <view class="section-title">前端 MediaContainer 方案</view>
+      <view class="desc">使用小程序原生 API 在客户端提取音频，无需云函数</view>
+    </view>
+    <!-- 视频预览 -->
+    <view class="section" wx:if="{{videoPath}}">
+      <view class="video-preview">
+        <video src="{{videoPath}}" class="preview-video" show-center-play-btn="{{true}}"></video>
+        <view class="video-meta">
+          <text>大小: {{videoSize}} MB</text>
+          <text class="clear-btn" bindtap="clearVideo">重新选择</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 转换按钮 -->
+    <view class="section" wx:if="{{!audioFileId}}">
+      <button bindtap="startProcess" loading="{{loading}}" type="primary" class="main-btn">
+        {{videoPath ? '开始转换' : '从相册选择视频'}}
+      </button>
+    </view>
+
+    <!-- 音频播放 -->
+    <view class="section" wx:if="{{audioFileId}}">
+      <view class="audio-result">
+        <view class="success-icon">✓</view>
+        <view class="success-text">转换成功</view>
+        <button bindtap="playAudio" type="primary" class="play-btn">
+          ▶ 播放预览
+        </button>
+        <button bindtap="downloadAudio" type="default" class="play-btn">
+          ⬇ 下载音频
+        </button>
+        <button bindtap="recognizeSpeech" loading="{{loading}}" type="warn" class="play-btn">
+          开始语音识别
+        </button>
+        <button bindtap="clearVideo" type="default" class="retry-btn">
+          重新选择
+        </button>
+      </view>
+    </view>
+
+    <!-- 识别结果 -->
+    <view class="section" wx:if="{{transcription}}">
+      <view class="section-title">识别结果</view>
+      <view class="result-box">
+        <text class="result-text">{{transcription}}</text>
+      </view>
+      <!-- 评分按钮 (参考 run.py:83-119) -->
+      <button bindtap="evaluateRecitation" loading="{{loading}}" type="primary" class="main-btn" wx:if="{{!evaluation}}">
+        LLM 智能评分
+      </button>
+    </view>
+
+    <!-- 评分结果 (参考 run.py:157-163) -->
+    <view class="section" wx:if="{{evaluation}}">
+      <view class="section-title">评分报告</view>
+      <view class="result-box">
+        <view class="result-row">
+          <text class="label">得分:</text>
+          <text class="value score">{{evaluation.score}} 分</text>
+        </view>
+        <view class="result-row">
+          <text class="label">评价:</text>
+          <text class="value">{{evaluation.comment}}</text>
+        </view>
+        <view class="result-row" wx:if="{{evaluation.missing_points.length > 0}}">
+          <text class="label">遗漏点:</text>
+          <view class="missing-points">
+            <text wx:for="{{evaluation.missing_points}}" wx:key="index" class="missing-point">• {{item}}</text>
+          </view>
+        </view>
+      </view>
+      <button bindtap="clearVideo" type="default" class="retry-btn">
+        重新评测
+      </button>
+    </view>
+
+    <!-- 文件列表按钮 -->
+    <view class="section">
+      <view class="section-title">查看上传的文件</view>
+      <button bindtap="queryDatabaseFiles" type="default" class="secondary-btn">
+        查看数据库记录
+      </button>
+      <view class="desc">或通过"云开发 → 存储"在控制台查看</view>
+    </view>
+  </view>
+
+  <!-- 日志面板 -->
+  <view class="logs-panel" wx:if="{{logs.length > 0}}">
+    <view class="logs-header">
+      <text>操作日志</text>
+      <text class="clear-log" bindtap="clearLogs">清空</text>
+    </view>
+    <scroll-view scroll-y class="logs-list">
+      <view wx:for="{{logs}}" wx:key="index" class="log-item">{{item}}</view>
+    </scroll-view>
+  </view>
+</view>

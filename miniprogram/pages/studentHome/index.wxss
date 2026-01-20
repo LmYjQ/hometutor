@@ -1,0 +1,181 @@
+.container {
+  min-height: 100vh;
+  background: #f5f7fa;
+  padding-bottom: 120rpx;
+}
+
+.header {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  padding: 40rpx 30rpx;
+  border-radius: 0 0 40rpx 40rpx;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+
+.avatar {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  margin-right: 20rpx;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+}
+
+.name {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #fff;
+}
+
+.role {
+  font-size: 24rpx;
+  color: rgba(255,255,255,0.8);
+  margin-top: 8rpx;
+}
+
+.stats {
+  display: flex;
+  gap: 60rpx;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-item .num {
+  font-size: 48rpx;
+  font-weight: bold;
+  color: #fff;
+}
+
+.stat-item .label {
+  font-size: 24rpx;
+  color: rgba(255,255,255,0.8);
+}
+
+.section-title {
+  padding: 30rpx;
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.assignment-list {
+  padding: 0 30rpx;
+}
+
+.assignment-card {
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+}
+
+.assignment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.assignment-card .class-name {
+  font-size: 24rpx;
+  color: #666;
+}
+
+.assignment-card .deadline {
+  font-size: 22rpx;
+  color: #999;
+}
+
+.assignment-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.5;
+}
+
+.assignment-status {
+  margin-top: 16rpx;
+}
+
+.status-tag {
+  display: inline-block;
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+}
+
+.status-tag.completed {
+  background: #e6fffb;
+  color: #13c2c2;
+}
+
+.class-list {
+  padding: 0 30rpx;
+}
+
+.class-item {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx 30rpx;
+  margin-bottom: 16rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.class-item .class-name {
+  font-size: 28rpx;
+  color: #333;
+}
+
+.class-item .teacher-name {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 100rpx 0;
+}
+
+.empty-icon {
+  font-size: 120rpx;
+  margin-bottom: 20rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #999;
+}
+
+.bottom-actions {
+  position: fixed;
+  bottom: 40rpx;
+  left: 30rpx;
+  right: 30rpx;
+}
+
+.join-btn {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 600;
+  border-radius: 60rpx;
+  height: 100rpx;
+  line-height: 100rpx;
+  border: none;
+}

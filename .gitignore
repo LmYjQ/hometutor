@@ -1,7 +1,6 @@
 # 微信小程序项目忽略文件
 
 # 项目配置文件
-project.config.json
 project.private.config.json
 
 # 编译生成文件

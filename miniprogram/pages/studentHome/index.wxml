@@ -1,0 +1,54 @@
+<view class="container">
+  <view class="header">
+    <view class="user-info">
+      <image class="avatar" src="{{userInfo.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
+      <view class="info">
+        <text class="name">{{userInfo.name}}</text>
+        <text class="role">学生</text>
+      </view>
+    </view>
+    <view class="stats">
+      <view class="stat-item">
+        <text class="num">{{classCount}}</text>
+        <text class="label">班级数</text>
+      </view>
+      <view class="stat-item">
+        <text class="num">{{pendingCount}}</text>
+        <text class="label">待完成</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-title">待完成作业</view>
+
+  <view class="assignment-list" wx:if="{{assignments.length > 0}}">
+    <view class="assignment-card" wx:for="{{assignments}}" wx:key="_id" bindtap="goToRecitation" data-id="{{item._id}}">
+      <view class="assignment-header">
+        <text class="class-name">{{item.class_name}}</text>
+        <text class="deadline" wx:if="{{item.isOverdue}}" style="color: #ff4d4f;">已截止</text>
+        <text class="deadline" wx:else>截止: {{item.deadlineText}}</text>
+      </view>
+      <view class="assignment-title">{{item.question_title}}</view>
+      <view class="assignment-status" wx:if="{{item.submitted}}">
+        <text class="status-tag completed">已提交</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty-state" wx:else>
+    <text class="empty-icon">📝</text>
+    <text class="empty-text">暂时没有待完成的作业</text>
+  </view>
+
+  <view class="section-title" wx:if="{{classes.length > 0}}">我加入的班级</view>
+  <view class="class-list" wx:if="{{classes.length > 0}}">
+    <view class="class-item" wx:for="{{classes}}" wx:key="_id">
+      <text class="class-name">{{item.name}}</text>
+      <text class="teacher-name">{{item.teacher_name}} 老师</text>
+    </view>
+  </view>
+
+  <view class="bottom-actions">
+    <button class="join-btn" bindtap="goToJoinClass">+ 加入班级</button>
+  </view>
+</view>
