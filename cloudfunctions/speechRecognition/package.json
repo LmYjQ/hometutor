@@ -1,0 +1,11 @@
+{
+  "name": "speechRecognition",
+  "version": "1.0.0",
+  "description": "语音识别云函数 - 调用 SiliconFlow API",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3",
+    "axios": "^1.6.0",
+    "form-data": "^4.0.0"
+  }
+}

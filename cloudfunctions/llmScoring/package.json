@@ -1,0 +1,10 @@
+{
+  "name": "llmScoring",
+  "version": "1.0.0",
+  "description": "LLM 评分云函数 - 调用 SiliconFlow API 对背诵进行评分",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3",
+    "axios": "^1.6.0"
+  }
+}
