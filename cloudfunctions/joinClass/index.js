@@ -19,12 +19,16 @@ exports.main = async (event, context) => {
 
   try {
     // 获取用户信息
-    const user = await db.collection('users').doc(openid).get();
-    if (!user.data) {
+    const userRes = await db.collection('users').where({
+      _openid: openid
+    }).get();
+
+    const user = userRes.data[0];
+    if (!user) {
       return { success: false, error: '用户信息不存在，请先登录' };
     }
 
-    if (user.data.role !== 'student') {
+    if (user.currentRole !== 'student' && user.role !== 'student') {
       return { success: false, error: '只有学生可以加入班级' };
     }
 

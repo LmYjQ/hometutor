@@ -39,8 +39,12 @@ exports.main = async (event, context) => {
 
   try {
     // 获取用户信息
-    const user = await db.collection('users').doc(openid).get();
-    if (!user.data || user.data.role !== 'teacher') {
+    const userRes = await db.collection('users').where({
+      _openid: openid
+    }).get();
+
+    const user = userRes.data[0];
+    if (!user || (user.currentRole !== 'teacher' && user.role !== 'teacher')) {
       return { success: false, error: '只有老师可以创建班级' };
     }
 
@@ -57,7 +61,7 @@ exports.main = async (event, context) => {
         _id: classId,
         name: name.trim(),
         teacher_id: openid,
-        teacher_name: user.data.name,
+        teacher_name: user.name,
         invite_code: inviteCode,
         student_ids: [],
         created_at: db.serverDate()
@@ -70,7 +74,7 @@ exports.main = async (event, context) => {
         _id: classId,
         name: name.trim(),
         invite_code: inviteCode,
-        teacher_name: user.data.name,
+        teacher_name: user.name,
         student_ids: []
       }
     };

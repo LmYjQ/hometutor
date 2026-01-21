@@ -13,15 +13,18 @@ exports.main = async (event, context) => {
 
   try {
     // 获取用户信息
-    const user = await db.collection('users').doc(openid).get();
+    const userRes = await db.collection('users').where({
+      _openid: openid
+    }).get();
 
-    if (!user.data) {
+    const user = userRes.data[0];
+    if (!user) {
       return { success: false, error: '用户信息不存在' };
     }
 
     let classes = [];
 
-    if (user.data.role === 'teacher') {
+    if (user.currentRole === 'teacher' || user.role === 'teacher') {
       // 老师：查询自己创建的班级
       const res = await db.collection('classes')
         .where({ teacher_id: openid })
