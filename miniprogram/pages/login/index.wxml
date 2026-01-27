@@ -1,23 +1,65 @@
 <view class="container">
-  <view class="logo-section">
-    <view class="logo"></view>
-    <text class="app-name">智能背诵助手</text>
-    <text class="app-desc">AI 帮你检查背诵作业</text>
+  <!-- 自动登录中 -->
+  <view class="loading-section" wx:if="{{isLoggingIn}}">
+    <text class="loading-text">登录中...</text>
   </view>
 
-  <view class="login-section">
-    <button class="role-btn teacher" bindtap="loginAsTeacher">
+  <!-- 新用户登录 - 用户信息确认 -->
+  <view class="user-info-section" wx:elif="{{showUserInfoModal}}">
+    <text class="section-title">完善个人信息</text>
+
+    <view class="back-btn" bindtap="goBack">
+      <text>← 返回</text>
+    </view>
+
+    <view class="avatar-section">
+      <button class="avatar-btn" bindtap="chooseAvatar">
+        <image class="avatar-img" src="{{tempAvatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
+        <text class="avatar-tip">点击更换头像</text>
+      </button>
+    </view>
+
+    <view class="nickname-section">
+      <text class="label">昵称</text>
+      <input class="nickname-input" placeholder="请输入您的昵称" placeholder-class="placeholder" bindinput="onNicknameInput" value="{{tempNickName}}"/>
+    </view>
+
+    <view class="role-select-section">
+      <text class="label">选择身份</text>
+      <view class="role-options">
+        <view class="role-option {{tempRole==='student'?'active':''}}" bindtap="selectRole" data-role="student">学生</view>
+        <view class="role-option {{tempRole==='teacher'?'active':''}}" bindtap="selectRole" data-role="teacher">老师</view>
+      </view>
+    </view>
+
+    <view class="teacher-code-section" wx:if="{{tempRole==='teacher'}}">
+      <text class="label">邀请码</text>
+      <input class="code-input" placeholder="请输入邀请码" placeholder-class="placeholder" bindinput="onInviteCodeInput" value="{{tempInviteCode}}"/>
+    </view>
+
+    <button class="confirm-btn" bindtap="confirmLogin" loading="{{loading}}">开始使用</button>
+  </view>
+
+  <!-- 新用户登录 - 初始状态 -->
+  <view class="login-section" wx:else>
+    <view class="logo-section">
+      <view class="logo"></view>
+      <text class="app-name">智能背诵助手</text>
+      <text class="app-desc">AI 帮你检查背诵作业</text>
+    </view>
+
+    <button class="role-btn teacher" bindtap="showUserInfoModal">
       <text class="role-icon">👨‍🏫</text>
       <text class="role-text">我是老师</text>
     </button>
 
-    <button class="role-btn student" bindtap="loginAsStudent">
+    <button class="role-btn student" bindtap="showUserInfoModal">
       <text class="role-icon">👨‍🎓</text>
       <text class="role-text">我是学生</text>
     </button>
-  </view>
 
-  <view class="info-section">
-    <text class="info-text">选择您的身份后即可开始使用</text>
+    <view class="info-section">
+      <text class="info-text">选择您的身份后即可开始使用</text>
+    </view>
   </view>
 </view>

@@ -1,0 +1,11 @@
+{
+  "name": "getAssignmentStudentStats",
+  "version": "1.0.0",
+  "description": "获取作业学生提交统计",
+  "main": "index.js",
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

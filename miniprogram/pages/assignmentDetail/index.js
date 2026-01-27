@@ -7,9 +7,9 @@ Page({
     className: '',
     loading: true,
     assignment: null,
-    submissions: [],
+    studentStats: [],
     submittedCount: 0,
-    studentCount: 0
+    totalStudentCount: 0
   },
 
   onLoad(options) {
@@ -25,18 +25,30 @@ Page({
   loadData() {
     this.setData({ loading: true });
 
-    // 获取作业详情和提交情况
     wx.cloud.callFunction({
-      name: 'getAssignmentSubmissions',
+      name: 'getAssignmentStudentStats',
       data: { assignmentId: this.data.assignmentId },
       success: (res) => {
         if (res.result.success) {
-          const assignments = res.result.data;
-          const assignment = assignments.find(a => a._id === this.data.assignmentId);
-          if (assignment) {
-            // 获取该作业的所有提交
-            this.loadSubmissions(assignment);
-          }
+          const { assignment, studentStats, submittedCount, totalStudentCount } = res.result.data;
+          // 格式化截止时间
+          const deadline = new Date(assignment.deadline);
+          const deadlineText = this.formatDate(deadline);
+
+          this.setData({
+            assignment: {
+              ...assignment,
+              deadlineText,
+              statusText: assignment.status === 'active' ? '进行中' : '已结束'
+            },
+            studentStats,
+            submittedCount,
+            totalStudentCount,
+            loading: false
+          });
+        } else {
+          console.error(res.result.error);
+          this.setData({ loading: false });
         }
       },
       fail: (err) => {
@@ -46,38 +58,8 @@ Page({
     });
   },
 
-  loadSubmissions(assignment) {
-    const db = wx.cloud.database();
-    const _ = db.command;
-
-    db.collection('submissions')
-      .where({ assignment_id: this.data.assignmentId })
-      .orderBy('created_at', 'desc')
-      .get()
-      .then((res) => {
-        const submissions = res.data.map(s => ({
-          ...s,
-          statusText: s.status === 'graded' ? '已评分' : '评分中',
-          created_atText: this.formatDate(s.created_at)
-        }));
-
-        this.setData({
-          assignment,
-          submissions,
-          submittedCount: submissions.length,
-          studentCount: assignment.studentCount || 0,
-          loading: false
-        });
-      })
-      .catch((err) => {
-        console.error('获取提交列表失败:', err);
-        this.setData({ loading: false });
-      });
-  },
-
-  formatDate(timestamp) {
-    if (!timestamp) return '';
-    const date = new Date(timestamp);
+  formatDate(date) {
+    if (!date) return '';
     const month = date.getMonth() + 1;
     const day = date.getDate();
     const hours = date.getHours();
@@ -85,13 +67,19 @@ Page({
     return `${month}月${day}日 ${hours}:${minutes}`;
   },
 
-  viewSubmission(e) {
-    const submissionId = e.currentTarget.dataset.id;
-    // 可以跳转到详情页，或弹出评分结果
+  viewStudentSubmissions(e) {
+    const { studentId, studentName } = e.currentTarget.dataset;
     wx.showModal({
-      title: '评分详情',
-      content: '功能开发中，可通过后台查看详细评分',
-      showCancel: false
+      title: studentName,
+      content: '可进入学生详情页查看该学生的所有提交记录',
+      confirmText: '查看详情',
+      success: (res) => {
+        if (res.confirm) {
+          wx.navigateTo({
+            url: `/pages/studentSubmissionDetail/index?assignmentId=${this.data.assignmentId}&studentId=${studentId}&studentName=${studentName}`
+          });
+        }
+      }
     });
   }
 });

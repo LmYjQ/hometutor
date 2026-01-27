@@ -28,7 +28,8 @@ exports.main = async (event, context) => {
       return { success: false, error: '用户信息不存在，请先登录' };
     }
 
-    if (user.currentRole !== 'student' && user.role !== 'student') {
+    // 检查用户是否为学生
+    if (user.role !== 'student') {
       return { success: false, error: '只有学生可以加入班级' };
     }
 

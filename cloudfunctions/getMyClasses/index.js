@@ -5,7 +5,6 @@ cloud.init({
 });
 
 const db = cloud.database();
-const _ = db.command;
 
 exports.main = async (event, context) => {
   const wxContext = cloud.getWXContext();
@@ -24,7 +23,7 @@ exports.main = async (event, context) => {
 
     let classes = [];
 
-    if (user.currentRole === 'teacher' || user.role === 'teacher') {
+    if (user.role === 'teacher') {
       // 老师：查询自己创建的班级
       const res = await db.collection('classes')
         .where({ teacher_id: openid })

@@ -7,16 +7,27 @@ cloud.init({
 const db = cloud.database();
 const _ = db.command;
 
+// 格式化日期
+function formatDate(date) {
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  return `${month}月${day}日 ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+}
+
 exports.main = async (event, context) => {
   const wxContext = cloud.getWXContext();
   const openid = wxContext.OPENID;
 
   try {
     // 获取用户信息
-    const user = await db.collection('users').doc(openid).get();
+    const userRes = await db.collection('users')
+      .where({ _openid: openid })
+      .get();
 
-    if (!user.data) {
-      return { success: false, error: '用户信息不存在' };
+    if (userRes.data.length === 0) {
+      return { success: false, error: '用户信息不存在', debug: { openid, step: 'check_user' } };
     }
 
     // 获取学生加入的所有班级
@@ -32,7 +43,8 @@ exports.main = async (event, context) => {
         data: {
           assignments: [],
           classes: []
-        }
+        },
+        debug: { openid, step: 'no_classes', message: '您还没有加入任何班级' }
       };
     }
 
@@ -51,6 +63,17 @@ exports.main = async (event, context) => {
 
     const assignments = assignmentsRes.data;
 
+    // 调试信息
+    const debugInfo = {
+      openid,
+      classIds,
+      classCount: classes.length,
+      assignmentCount: assignments.length,
+      message: assignments.length === 0
+        ? `已加入${classes.length}个班级，但这些班级暂无作业`
+        : null
+    };
+
     // 获取学生已提交的作业
     const submissionsRes = await db.collection('submissions')
       .where({
@@ -68,7 +91,7 @@ exports.main = async (event, context) => {
 
       return {
         ...assignment,
-        deadlineText: this.formatDate(deadline),
+        deadlineText: formatDate(deadline),
         isOverdue,
         submitted: submittedIds.has(assignment._id)
       };
@@ -83,19 +106,11 @@ exports.main = async (event, context) => {
           name: c.name,
           teacher_name: c.teacher_name
         }))
-      }
+      },
+      debug: debugInfo
     };
   } catch (error) {
     console.error('获取作业列表失败:', error);
     return { success: false, error: error.message || '获取作业列表失败' };
   }
-};
-
-// 格式化日期
-exports.formatDate = function(date) {
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  return `${month}月${day}日 ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 };

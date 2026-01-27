@@ -8,6 +8,8 @@
     "pages/studentHome/index",
     "pages/joinClass/index",
     "pages/classDetail/index",
+    "pages/assignmentDetail/index",
+    "pages/publishAssignmentChat/index",
     "pages/recitation/index",
     "pages/submissionResult/index",
     "pages/myProfile/index"

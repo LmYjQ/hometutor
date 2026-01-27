@@ -10,6 +10,7 @@ Page({
       reference_text: '',
       deadline: ''
     },
+    cameraPosition: 'back',
     isRecording: false,
     recordingTimer: null,
     recordTime: 0,
@@ -71,15 +72,15 @@ Page({
     });
   },
 
-  // 开始录制
-  startRecord() {
-    const ctx = wx.createCameraContext();
-    this.setData({ recordingCtx: ctx });
-    this.toggleRecord();
+  onReady() {
+    // 页面 Ready 时创建 camera context
+    console.log('[Recitation] onReady，创建 CameraContext');
+    this.setData({ recordingCtx: wx.createCameraContext() });
   },
 
   // 切换录制状态
   toggleRecord() {
+    console.log('[Recitation] toggleRecord, isRecording:', this.data.isRecording);
     if (this.data.isRecording) {
       this.stopRecording();
     } else {
@@ -90,20 +91,16 @@ Page({
   // 开始录制
   startRecording() {
     const ctx = this.data.recordingCtx;
-    if (!ctx) {
-      // 如果没有camera context，尝试创建
-      this.setData({ isRecording: true });
-      this.startTimer();
-      return;
-    }
+    console.log('[Recitation] startRecording, ctx:', !!ctx);
 
     ctx.startRecord({
       success: () => {
+        console.log('[Recitation] 录制已开始');
         this.setData({ isRecording: true });
         this.startTimer();
       },
       fail: (err) => {
-        console.error('开始录制失败:', err);
+        console.error('[Recitation] 开始录制失败:', err);
         wx.showToast({ title: '无法开始录制', icon: 'none' });
       }
     });
@@ -111,17 +108,18 @@ Page({
 
   // 停止录制
   stopRecording() {
+    console.log('[Recitation] stopRecording 被调用');
     const ctx = this.data.recordingCtx;
-    if (ctx) {
-      ctx.stopRecord({
-        success: (res) => {
-          this.handleVideoResult(res.tempVideoPath, res.tempThumbPath);
-        },
-        fail: (err) => {
-          console.error('停止录制失败:', err);
-        }
-      });
-    }
+
+    ctx.stopRecord({
+      success: (res) => {
+        console.log('[Recitation] 录制停止成功, tempVideoPath:', res.tempVideoPath);
+        this.handleVideoResult(res.tempVideoPath, res.tempThumbPath);
+      },
+      fail: (err) => {
+        console.error('[Recitation] 停止录制失败:', err);
+      }
+    });
 
     this.stopTimer();
     this.setData({ isRecording: false });
@@ -129,11 +127,12 @@ Page({
 
   // 处理录制结果
   handleVideoResult(videoPath, thumbPath) {
+    console.log('[Recitation] handleVideoResult, path:', videoPath);
     wx.getFileInfo({
       filePath: videoPath,
       success: (res) => {
         const sizeMB = (res.size / 1024 / 1024).toFixed(2);
-        console.log(`视频录制成功: ${sizeMB} MB`);
+        console.log(`[Recitation] 视频录制成功: ${sizeMB} MB`);
 
         this.setData({
           videoPath: videoPath,
@@ -141,7 +140,8 @@ Page({
           fileSizeText: `${sizeMB} MB`
         });
       },
-      fail: () => {
+      fail: (err) => {
+        console.error('[Recitation] getFileInfo 失败:', err);
         this.setData({ videoPath: videoPath });
       }
     });
@@ -164,6 +164,13 @@ Page({
       clearInterval(this.data.recordingTimer);
       this.data.recordingTimer = null;
     }
+  },
+
+  // 切换摄像头
+  switchCamera() {
+    this.setData({
+      cameraPosition: this.data.cameraPosition === 'back' ? 'front' : 'back'
+    });
   },
 
   // 重新录制

@@ -56,10 +56,27 @@
   margin: 0 30rpx;
 }
 
-.camera-preview {
+.camera-container,
+.video-container {
   background: #000;
   border-radius: 16rpx;
   overflow: hidden;
+  position: relative;
+}
+
+.camera-controls {
+  position: absolute;
+  top: 20rpx;
+  right: 20rpx;
+  z-index: 10;
+}
+
+.switch-camera-btn {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 12rpx 20rpx;
+  border-radius: 30rpx;
+  color: #fff;
+  font-size: 24rpx;
 }
 
 .video-preview {
@@ -67,14 +84,28 @@
   height: 400rpx;
 }
 
+.video-overlay {
+  position: absolute;
+  bottom: 20rpx;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .record-placeholder {
   background: #333;
   border-radius: 16rpx;
-  height: 400rpx;
+  min-height: 400rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: 40rpx 30rpx;
+}
+
+.placeholder-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .placeholder-icon {
@@ -93,9 +124,38 @@
   font-size: 24rpx;
 }
 
+.or-divider {
+  display: flex;
+  align-items: center;
+  width: 80%;
+  margin: 30rpx 0;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1rpx;
+  background: rgba(255,255,255,0.2);
+}
+
+.divider-text {
+  color: #999;
+  font-size: 24rpx;
+  padding: 0 20rpx;
+}
+
+.album-btn {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  font-size: 28rpx;
+  border: 1rpx solid rgba(255,255,255,0.3);
+  padding: 20rpx 50rpx;
+  border-radius: 40rpx;
+}
+
 .record-controls {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   margin-top: 40rpx;
 }
 
@@ -132,6 +192,28 @@
   color: #fff;
   font-size: 24rpx;
   margin-top: 4rpx;
+}
+
+.record-label {
+  color: #fff;
+  font-size: 22rpx;
+  margin-top: 4rpx;
+}
+
+.album-section {
+  margin-top: 30rpx;
+}
+
+.album-btn {
+  margin-top: 30rpx;
+  background: rgba(255,255,255,0.15);
+  color: #666;
+  font-size: 28rpx;
+  border: 1rpx solid #ddd;
+  padding: 20rpx 60rpx;
+  border-radius: 40rpx;
+  text-align: center;
+  background: #f5f5f5;
 }
 
 .re-record {

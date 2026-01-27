@@ -1,6 +1,6 @@
 <view class="container">
   <view class="header">
-    <view class="user-info">
+    <view class="user-info" bindtap="goToProfile">
       <image class="avatar" src="{{userInfo.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
       <view class="info">
         <text class="name">{{userInfo.name}}</text>
@@ -19,7 +19,14 @@
     </view>
   </view>
 
-  <view class="section-title">待完成作业</view>
+  <view class="section-title">
+    待完成作业
+    <text class="refresh-btn" bindtap="refreshAssignments">刷新</text>
+  </view>
+
+  <view class="debug-info" wx:if="{{debugInfo}}">
+    <text>{{debugInfo}}</text>
+  </view>
 
   <view class="assignment-list" wx:if="{{assignments.length > 0}}">
     <view class="assignment-card" wx:for="{{assignments}}" wx:key="_id" bindtap="goToRecitation" data-id="{{item._id}}">

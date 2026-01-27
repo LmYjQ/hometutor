@@ -1,0 +1,43 @@
+<view class="chat-container" id="chat-container">
+  <!-- 聊天消息列表 -->
+  <scroll-view class="messages" scroll-y scroll-into-view="{{scrollIntoView}}" scroll-with-animation>
+    <block wx:for="{{messages}}" wx:key="id">
+      <view id="msg-{{item.id}}" wx:if="{{item.type === 'system'}}" class="message system">
+        <view class="bubble system-bubble">{{item.content}}</view>
+      </view>
+
+      <view id="msg-{{item.id}}" wx:elif="{{item.type === 'user'}}" class="message user">
+        <view class="bubble user-bubble">
+          <text>{{item.content}}</text>
+          <view wx:if="{{item.attachment}}" class="attachment">
+            <text class="icon">📄</text>
+            <text>{{item.attachment}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view id="msg-{{item.id}}" wx:else class="message assistant">
+        <view class="bubble assistant-bubble">
+          <text>{{item.content}}</text>
+          <view wx:if="{{item.previewData}}" class="preview-actions">
+            <button class="btn-primary" bindtap="confirmPublish" loading="{{uploading}}">确认发布</button>
+          </view>
+        </view>
+      </view>
+    </block>
+  </scroll-view>
+
+  <!-- 底部操作区 -->
+  <view class="footer">
+    <view class="action-buttons">
+      <button class="upload-btn" bindtap="onPasteFromClipboard" loading="{{uploading}}">
+        <text class="icon">📋</text>
+        <text>从剪贴板复制</text>
+      </button>
+      <button class="upload-btn" bindtap="onChooseImage" loading="{{uploading}}">
+        <text class="icon">📎</text>
+        <text>上传Excel</text>
+      </button>
+    </view>
+  </view>
+</view>

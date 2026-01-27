@@ -5,23 +5,17 @@
   </view>
 
   <view class="input-section">
-    <view class="code-inputs">
-      <input
-        class="code-input"
-        wx:for="{{codeInputs}}"
-        wx:key="index"
-        type="text"
-        maxlength="1"
-        value="{{item}}"
-        focus="{{index === focusIndex}}"
-        data-index="{{index}}"
-        bindinput="onInput"
-        bindfocus="onFocus"
-      />
-    </view>
-    <input class="hidden-input" type="text" focus="{{focusOnHidden}}" bindinput="onHiddenInput"/>
+    <input
+      class="invite-code-input"
+      type="text"
+      maxlength="6"
+      placeholder="请输入6位邀请码"
+      placeholder-class="placeholder"
+      focus="{{true}}"
+      bindinput="onInput"
+    />
 
-    <button class="join-btn" bindtap="joinClass" loading="{{joining}}" disabled="{{!canJoin}}">
+    <button class="join-btn" bindtap="joinClass" loading="{{joining}}" disabled="{{code.length !== 6}}">
       加入班级
     </button>
   </view>

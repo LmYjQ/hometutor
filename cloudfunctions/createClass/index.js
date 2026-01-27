@@ -44,7 +44,12 @@ exports.main = async (event, context) => {
     }).get();
 
     const user = userRes.data[0];
-    if (!user || (user.currentRole !== 'teacher' && user.role !== 'teacher')) {
+    if (!user) {
+      return { success: false, error: '用户信息不存在，请先登录' };
+    }
+
+    // 检查用户是否为老师
+    if (user.role !== 'teacher') {
       return { success: false, error: '只有老师可以创建班级' };
     }
 
@@ -58,7 +63,6 @@ exports.main = async (event, context) => {
     const classId = 'class_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     await db.collection('classes').doc(classId).set({
       data: {
-        _id: classId,
         name: name.trim(),
         teacher_id: openid,
         teacher_name: user.name,

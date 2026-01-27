@@ -23,6 +23,10 @@
   margin-bottom: 20rpx;
 }
 
+.student-count {
+  border-bottom: 1rpx dashed rgba(255,255,255,0.5);
+}
+
 .copy-btn {
   display: inline-block;
   background: rgba(255,255,255,0.2);
@@ -32,6 +36,18 @@
   border-radius: 30rpx;
   border: none;
   line-height: 1.5;
+}
+
+.publish-btn {
+  display: inline-block;
+  background: #07c160;
+  color: #fff;
+  font-size: 26rpx;
+  padding: 16rpx 40rpx;
+  border-radius: 30rpx;
+  border: none;
+  line-height: 1.5;
+  margin-left: 20rpx;
 }
 
 .section-title {
@@ -99,4 +115,22 @@
 .empty-desc {
   font-size: 24rpx;
   color: #999;
+}
+
+.student-list {
+  background: #fff;
+  margin: 0 30rpx;
+  border-radius: 16rpx;
+  padding: 20rpx 30rpx;
+}
+
+.student-item {
+  padding: 12rpx 0;
+  font-size: 26rpx;
+  color: #333;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.student-item:last-child {
+  border-bottom: none;
 }

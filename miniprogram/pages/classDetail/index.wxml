@@ -3,9 +3,17 @@
     <view class="class-name">{{classInfo.name}}</view>
     <view class="class-meta">
       <text class="invite-code">邀请码: {{classInfo.invite_code}}</text>
-      <text class="student-count">{{classInfo.student_ids.length}} 名学生</text>
+      <text class="student-count" bindtap="toggleStudents">{{classInfo.student_ids.length}} 名学生</text>
     </view>
     <button class="copy-btn" bindtap="copyInviteCode">复制邀请码</button>
+    <button class="publish-btn" bindtap="publishAssignment">发布作业</button>
+  </view>
+
+  <!-- 学生列表 -->
+  <view class="student-list" wx:if="{{showStudents && classInfo.student_ids.length > 0}}">
+    <view class="student-item" wx:for="{{classInfo.student_ids}}" wx:key="index">
+      {{item}}
+    </view>
   </view>
 
   <view class="section-title">作业历史</view>

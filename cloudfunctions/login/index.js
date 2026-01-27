@@ -5,7 +5,6 @@ cloud.init({
 });
 
 const db = cloud.database();
-const _ = db.command;
 
 exports.main = async (event, context) => {
   const wxContext = cloud.getWXContext();
@@ -24,7 +23,9 @@ exports.main = async (event, context) => {
   try {
     // 查询用户是否已存在（使用_openid查询）
     const userRes = await db.collection('users')
-      .where({ _openid: openid })
+      .where({
+        _openid: openid
+      })
       .get();
 
     if (userRes.data.length > 0) {
@@ -36,16 +37,9 @@ exports.main = async (event, context) => {
         updated_at: db.serverDate()
       };
 
-      // 如果用户已有角色，且选择了新角色，添加到roles数组
-      if (role) {
-        const existingRoles = userData.roles || [];
-        if (!existingRoles.includes(role)) {
-          updateData.roles = _.push([role]);
-        }
-        // 设置当前角色（如果之前没有或选择了不同角色）
-        if (!userData.currentRole || userData.currentRole !== role) {
-          updateData.currentRole = role;
-        }
+      // 如果选择了新角色，更新角色
+      if (role && userData.role !== role) {
+        updateData.role = role;
       }
 
       // 只有当有需要更新的字段时才执行更新
@@ -55,8 +49,8 @@ exports.main = async (event, context) => {
         });
       }
 
-      // 返回当前使用的角色
-      const currentRole = role || userData.currentRole || 'student';
+      // 返回当前角色
+      const currentRole = role || userData.role || 'student';
 
       return {
         success: true,
@@ -64,8 +58,7 @@ exports.main = async (event, context) => {
           _openid: openid,
           name: name || userData.name,
           avatarUrl: avatarUrl || userData.avatarUrl,
-          roles: userData.roles || [userData.role].filter(Boolean),
-          currentRole: currentRole,
+          role: currentRole,
           isNew: false
         }
       };
@@ -110,8 +103,8 @@ exports.main = async (event, context) => {
   // 创建新用户
   const addRes = await db.collection('users').add({
     data: {
-      roles: [role || 'student'],
-      currentRole: role || 'student',
+      _openid: openid,
+      role: role || 'student',
       name: name || '未命名用户',
       avatarUrl: avatarUrl || '',
       created_at: db.serverDate(),
@@ -123,8 +116,7 @@ exports.main = async (event, context) => {
     success: true,
     data: {
       _openid: openid,
-      roles: [role || 'student'],
-      currentRole: role || 'student',
+      role: role || 'student',
       name: name || '未命名用户',
       avatarUrl: avatarUrl || '',
       isNew: true

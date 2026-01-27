@@ -97,6 +97,12 @@ Page({
     });
   },
 
+  goToProfile() {
+    wx.navigateTo({
+      url: '/pages/myProfile/index'
+    });
+  },
+
   onShareAppMessage() {
     return {
       title: '智能背诵助手 - 快速创建班级',

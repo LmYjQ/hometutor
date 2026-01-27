@@ -7,7 +7,8 @@ Page({
       invite_code: '',
       student_ids: []
     },
-    assignments: []
+    assignments: [],
+    showStudents: false
   },
 
   onLoad(options) {
@@ -65,10 +66,20 @@ Page({
     });
   },
 
+  toggleStudents() {
+    this.setData({ showStudents: !this.data.showStudents });
+  },
+
   goToAssignmentDetail(e) {
     const assignmentId = e.currentTarget.dataset.id;
     wx.navigateTo({
       url: `/pages/assignmentDetail/index?assignmentId=${assignmentId}&className=${this.data.classInfo.name}`
+    });
+  },
+
+  publishAssignment() {
+    wx.navigateTo({
+      url: `/pages/publishAssignmentChat/index?classId=${this.data.classId}&className=${this.data.classInfo.name}`
     });
   }
 });

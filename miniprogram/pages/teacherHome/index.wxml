@@ -1,6 +1,6 @@
 <view class="container">
   <view class="header">
-    <view class="user-info">
+    <view class="user-info" bindtap="goToProfile">
       <image class="avatar" src="{{userInfo.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
       <view class="info">
         <text class="name">{{userInfo.name}}</text>

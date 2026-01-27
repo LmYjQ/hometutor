@@ -10,9 +10,9 @@
 
   <!-- 菜单列表 -->
   <view class="menu-list">
-    <view class="menu-item" bindtap="switchRole" wx:if="{{userInfo.role}}">
+    <view class="menu-item" bindtap="switchIdentity" wx:if="{{userInfo.role}}">
       <text class="menu-icon">🔄</text>
-      <text class="menu-text">切换身份 ({{userInfo.role === 'teacher' ? '老师' : '学生'}})</text>
+      <text class="menu-text">切换身份 ({{roleText}})</text>
       <text class="menu-arrow">></text>
     </view>
 

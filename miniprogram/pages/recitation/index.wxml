@@ -6,50 +6,44 @@
     <view class="deadline">截止时间: {{assignment.deadlineText}}</view>
   </view>
 
-  <!-- 参考文本 -->
-  <view class="reference-section" wx:if="{{assignment.reference_text}}">
-    <view class="section-title">参考文本</view>
-    <view class="reference-text">{{assignment.reference_text}}</view>
-  </view>
-
   <!-- 录制区域 -->
   <view class="record-section">
-    <view class="camera-preview" wx:if="{{isRecording || videoPath}}">
-      <video
-        class="video-preview"
-        src="{{videoPath}}"
-        wx:if="{{videoPath}}"
-        controls
-      ></video>
+    <!-- 视频预览（录制完成后显示） -->
+    <view class="video-container" wx:if="{{videoPath}}">
+      <video class="video-preview" src="{{videoPath}}" controls></video>
+      <view class="video-overlay">
+        <view class="re-record-btn" bindtap="reRecord">重新录制</view>
+      </view>
+    </view>
+
+    <!-- 摄像头预览和录制 -->
+    <view class="camera-container" wx:else>
       <camera
-        wx:if="{{!videoPath}}"
-        device-position="back"
+        device-position="{{cameraPosition}}"
         flash="off"
         binderror="onCameraError"
         style="width: 100%; height: 400rpx; border-radius: 16rpx;"
       ></camera>
-    </view>
-
-    <view class="record-placeholder" wx:else bindtap="startRecord">
-      <text class="placeholder-icon">🎥</text>
-      <text class="placeholder-text">点击开始录制</text>
-      <text class="placeholder-hint">建议录制15-60秒</text>
+      <view class="camera-controls" wx:if="{{!isRecording}}">
+        <view class="switch-camera-btn" bindtap="switchCamera">
+          <text>🔄 翻转</text>
+        </view>
+      </view>
     </view>
 
     <!-- 录制控制 -->
     <view class="record-controls" wx:if="{{!videoPath}}">
-      <button
+      <view
         class="record-btn {{isRecording ? 'recording' : ''}}"
         bindtap="toggleRecord"
       >
         <text class="record-icon">{{isRecording ? '⏹' : '⏺'}}</text>
         <text class="record-time" wx:if="{{isRecording}}">{{recordTime}}s</text>
-      </button>
-    </view>
+        <text class="record-label">{{isRecording ? '停止' : '录制'}}</text>
+      </view>
 
-    <!-- 重新录制 -->
-    <view class="re-record" wx:if="{{videoPath}}">
-      <button class="re-record-btn" bindtap="reRecord">重新录制</button>
+      <!-- 相册选择 -->
+      <view class="album-btn" wx:if="{{!isRecording}}" bindtap="chooseFromAlbum">从相册选择视频</view>
     </view>
   </view>
 

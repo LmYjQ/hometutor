@@ -30,11 +30,11 @@ async function getAssignment(assignmentId) {
  * 获取用户信息
  */
 async function getUserInfo(openid) {
-  const res = await db.collection('users').doc(openid).get();
-  if (!res.data) {
+  const res = await db.collection('users').where({ _openid: openid }).get();
+  if (!res.data || res.data.length === 0) {
     throw new Error('用户信息不存在');
   }
-  return res.data;
+  return res.data[0];
 }
 
 /**
@@ -172,6 +172,8 @@ exports.main = async (event, context) => {
 
   console.log(`[Submit] 开始处理提交, assignmentId: ${assignmentId}, fileID: ${fileID}`);
 
+  let submissionId = null;
+
   try {
     // 1. 获取作业信息
     const assignment = await getAssignment(assignmentId);
@@ -182,17 +184,19 @@ exports.main = async (event, context) => {
     console.log('[Submit] 用户:', user.name);
 
     // 3. 创建待评分记录
-    const submissionId = 'sub_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    submissionId = 'sub_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     await db.collection('submissions').doc(submissionId).set({
       data: {
-        _id: submissionId,
         assignment_id: assignmentId,
         student_id: openid,
         student_name: user.name,
         video_file_id: fileID,
         audio_text: '',
-        score: null,
-        evaluation: null,
+        score: 0,
+        evaluation: {
+          missing_points: [],
+          comment: ''
+        },
         status: 'pending',
         created_at: db.serverDate()
       }
@@ -252,15 +256,17 @@ exports.main = async (event, context) => {
     console.error('[Submit] 处理失败:', error);
 
     // 更新记录状态为失败
-    try {
-      await db.collection('submissions').doc(submissionId).update({
-        data: {
-          status: 'failed',
-          error: error.message
-        }
-      });
-    } catch (e) {
-      console.error('[Submit] 更新失败状态出错:', e);
+    if (submissionId) {
+      try {
+        await db.collection('submissions').doc(submissionId).update({
+          data: {
+            status: 'failed',
+            error: error.message
+          }
+        });
+      } catch (e) {
+        console.error('[Submit] 更新失败状态出错:', e);
+      }
     }
 
     return { success: false, error: error.message };
