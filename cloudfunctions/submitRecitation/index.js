@@ -8,12 +8,15 @@ cloud.init({
 
 // SiliconFlow API 配置
 const ASR_URL = 'https://api.siliconflow.cn/v1/audio/transcriptions';
-const ASR_MODEL = 'TeleAI/TeleSpeechASR';
+const ASR_MODEL =  'FunAudioLLM/SenseVoiceSmall' // 'TeleAI/TeleSpeechASR';
 const LLM_URL = 'https://api.siliconflow.cn/v1/chat/completions';
-const LLM_MODEL = 'deepseek-ai/DeepSeek-V3';
+const LLM_MODEL = 'Qwen/Qwen3-8B';
 
 const db = cloud.database();
 const _ = db.command;
+
+// 从环境变量读取最大提交次数
+const MAX_SUBMISSIONS = parseInt(process.env.MAX_SUBMISSIONS_PER_ASSIGNMENT) || 0;
 
 /**
  * 获取作业详情
@@ -84,20 +87,43 @@ async function callSiliconFlowASR(audioBuffer) {
 
   console.log('[ASR] 发送请求...');
 
-  const response = await axios.post(ASR_URL, form, {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      ...form.getHeaders(),
-    },
-    timeout: 180000,
-  });
+  try {
+    const response = await axios.post(ASR_URL, form, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        ...form.getHeaders(),
+      },
+      timeout: 180000,
+    });
 
-  console.log('[ASR] 响应状态:', response.status);
+    console.log('[ASR] 响应状态:', response.status);
 
-  if (response.status === 200) {
-    return response.data.text || '';
-  } else {
-    throw new Error(`ASR API 请求失败: ${response.status}`);
+    if (response.status === 200) {
+      return response.data.text || '';
+    } else {
+      throw new Error(`ASR API 请求失败: 状态码 ${response.status}`);
+    }
+  } catch (error) {
+    // 区分不同类型的错误
+    if (error.response) {
+      // 服务器返回错误状态码
+      const status = error.response.status;
+      const msg = error.response.data?.message || error.response.statusText;
+      console.error('[ASR] API 错误:', status, msg);
+      if (status === 403) {
+        throw new Error(`ASR API 无权限(403): 请检查 API Key 或账户状态`);
+      } else if (status === 401) {
+        throw new Error(`ASR API 认证失败(401): API Key 无效`);
+      } else if (status === 429) {
+        throw new Error(`ASR API 请求过于频繁(429): 请稍后重试`);
+      } else {
+        throw new Error(`ASR API 错误(${status}): ${msg}`);
+      }
+    } else if (error.code === 'ECONNABORTED') {
+      throw new Error('ASR 请求超时: 服务器响应超过180秒');
+    } else {
+      throw new Error(`ASR 网络错误: ${error.message}`);
+    }
   }
 }
 
@@ -124,37 +150,70 @@ async function callSiliconFlowLLM(referenceText, studentText) {
 }`;
 
   console.log('[LLM] 发送请求...');
+  console.log('[LLM] 模型:', LLM_MODEL);
+  console.log('[LLM] 标准答案长度:', referenceText.length);
+  console.log('[LLM] 学生背诵长度:', studentText.length);
 
-  const response = await axios.post(
-    LLM_URL,
-    {
-      model: LLM_MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.1,
-      response_format: { type: 'json_object' },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+  try {
+    const response = await axios.post(
+      LLM_URL,
+      {
+        model: LLM_MODEL,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
       },
-      timeout: 180000,
-    }
-  );
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 180000,
+      }
+    );
 
-  console.log('[LLM] 响应状态:', response.status);
+    console.log('[LLM] 响应状态:', response.status);
 
-  if (response.status === 200) {
-    const content = response.data.choices?.[0]?.message?.content;
-    if (content) {
-      return JSON.parse(content);
+    if (response.status === 200) {
+      const content = response.data.choices?.[0]?.message?.content;
+      if (content) {
+        return JSON.parse(content);
+      }
+      throw new Error('LLM 返回内容为空');
+    } else {
+      throw new Error(`LLM API 请求失败: 状态码 ${response.status}`);
     }
-    throw new Error('LLM 返回内容为空');
-  } else {
-    throw new Error(`LLM API 请求失败: ${response.status}`);
+  } catch (error) {
+    // 区分不同类型的错误
+    if (error.response) {
+      const status = error.response.status;
+      const msg = error.response.data?.message || error.response.statusText;
+      const responseData = error.response.data;
+      console.error('========== LLM API 错误 ==========');
+      console.error('[LLM] 状态码:', status);
+      console.error('[LLM] 错误信息:', msg);
+      console.error('[LLM] 模型:', LLM_MODEL);
+      console.error('[LLM] 响应数据:', JSON.stringify(responseData, null, 2));
+      console.error('===================================');
+      if (status === 403) {
+        throw new Error(`LLM API 无权限(403): 请检查 API Key 或账户状态`);
+      } else if (status === 401) {
+        throw new Error(`LLM API 认证失败(401): API Key 无效`);
+      } else if (status === 429) {
+        throw new Error(`LLM API 请求过于频繁(429): 请稍后重试`);
+      } else if (status === 400) {
+        throw new Error(`LLM API 请求参数错误(400): ${msg}`);
+      } else {
+        throw new Error(`LLM API 错误(${status}): ${msg}`);
+      }
+    } else if (error.code === 'ECONNABORTED') {
+      throw new Error('LLM 请求超时: 服务器响应超过180秒');
+    } else {
+      throw new Error(`LLM 网络错误: ${error.message}`);
+    }
   }
 }
 
@@ -183,7 +242,28 @@ exports.main = async (event, context) => {
     const user = await getUserInfo(openid);
     console.log('[Submit] 用户:', user.name);
 
-    // 3. 创建待评分记录
+    // 3. 检查提交次数限制
+    if (MAX_SUBMISSIONS > 0) {
+      const countRes = await db.collection('submissions')
+        .where({
+          assignment_id: assignmentId,
+          student_id: openid,
+          status: 'graded'
+        })
+        .count();
+
+      console.log(`[Submit] 已成功提交 ${countRes.total} 次，最大限制 ${MAX_SUBMISSIONS} 次`);
+
+      if (countRes.total >= MAX_SUBMISSIONS) {
+        return {
+          success: false,
+          error: `该作业最多只能提交 ${MAX_SUBMISSIONS} 次，您已达上限`,
+          code: 'SUBMISSION_LIMIT_EXCEEDED'
+        };
+      }
+    }
+
+    // 4. 创建待评分记录
     submissionId = 'sub_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     await db.collection('submissions').doc(submissionId).set({
       data: {
@@ -249,7 +329,8 @@ exports.main = async (event, context) => {
         submissionId,
         audioText,
         score: llmResult.score,
-        evaluation: llmResult
+        evaluation: llmResult,
+        maxSubmissions: MAX_SUBMISSIONS
       }
     };
   } catch (error) {

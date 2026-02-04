@@ -5,8 +5,23 @@
     <text class="loading-text">正在获取评分结果...</text>
   </view>
 
+  <!-- 待评分状态 -->
+  <view class="pending" wx:if="{{!loading && isPending && submission}}">
+    <view class="pending-icon">⏳</view>
+    <text class="pending-text">评分中，请稍候...</text>
+    <text class="pending-hint">AI正在分析您的背诵内容，预计需要1-3分钟</text>
+  </view>
+
+  <!-- 失败状态 -->
+  <view class="failed" wx:if="{{!loading && isFailed && submission}}">
+    <view class="failed-icon">❌</view>
+    <text class="failed-title">评分失败</text>
+    <text class="failed-error">{{error}}</text>
+    <button class="retry-btn" bindtap="goToRecitation">重新提交</button>
+  </view>
+
   <!-- 评分结果 -->
-  <view class="result" wx:if="{{!loading && submission}}">
+  <view class="result" wx:if="{{!loading && submission && !isFailed && !isPending}}">
     <!-- 分数卡片 -->
     <view class="score-card">
       <view class="score-ring">

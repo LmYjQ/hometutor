@@ -58,11 +58,12 @@
       class="submit-btn"
       bindtap="submitRecitation"
       loading="{{uploading || analyzing}}"
-      disabled="{{uploading || analyzing}}"
+      disabled="{{uploading || analyzing || remainingSubmissions === 0}}"
     >
-      <text wx:if="{{!uploading && !analyzing}}">提交背诵</text>
       <text wx:if="{{uploading}}">上传中...</text>
-      <text wx:if="{{analyzing}}">AI评分中...</text>
+      <text wx:elif="{{analyzing}}">AI评分中...</text>
+      <text wx:elif="{{remainingSubmissions === 0}}">已达提交次数上限</text>
+      <text wx:else>提交背诵</text>
     </button>
 
     <view class="progress-section" wx:if="{{analyzing}}">

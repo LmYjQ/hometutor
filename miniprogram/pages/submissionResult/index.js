@@ -26,10 +26,31 @@ Page({
         if (res.result.success) {
           const submission = res.result.data[0];
           if (submission) {
-            this.setData({
-              submission,
-              loading: false
-            });
+            // 检查是否为失败状态
+            if (submission.status === 'failed') {
+              this.setData({
+                submission,
+                error: submission.error || '评分失败，请重新提交',
+                loading: false
+              });
+            } else if (submission.status === 'pending') {
+              // 待评分状态，显示提示
+              this.setData({
+                submission,
+                loading: false
+              });
+              wx.showToast({
+                title: '评分中，请稍候...',
+                icon: 'none',
+                duration: 3000
+              });
+            } else {
+              // 评分完成
+              this.setData({
+                submission,
+                loading: false
+              });
+            }
           } else {
             this.setData({
               error: '未找到提交记录',
@@ -58,6 +79,14 @@ Page({
     if (score >= 80) return '#52c41a';
     if (score >= 60) return '#faad14';
     return '#ff4d4f';
+  },
+
+  get isFailed() {
+    return this.data.submission?.status === 'failed';
+  },
+
+  get isPending() {
+    return this.data.submission?.status === 'pending';
   },
 
   goToRecitation() {

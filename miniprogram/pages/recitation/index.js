@@ -20,7 +20,9 @@ Page({
     analyzing: false,
     progress: 0,
     progressText: '准备中...',
-    historySubmissions: []
+    historySubmissions: [],
+    maxSubmissions: 0,
+    remainingSubmissions: -1
   },
 
   onLoad(options) {
@@ -67,9 +69,24 @@ Page({
       success: (res) => {
         if (res.result.success) {
           this.setData({ historySubmissions: res.result.data });
+          // 计算剩余提交次数
+          this.updateRemainingSubmissions();
         }
       }
     });
+  },
+
+  // 更新剩余提交次数
+  updateRemainingSubmissions() {
+    const maxSubs = this.data.maxSubmissions;
+    if (maxSubs > 0) {
+      const gradedCount = this.data.historySubmissions.filter(
+        s => s.status === 'graded'
+      ).length;
+      this.setData({
+        remainingSubmissions: Math.max(0, maxSubs - gradedCount)
+      });
+    }
   },
 
   onReady() {
@@ -241,6 +258,12 @@ Page({
         },
         success: (res) => {
           if (res.result.success) {
+            // 更新最大提交次数配置
+            if (res.result.data.maxSubmissions) {
+              this.setData({ maxSubmissions: res.result.data.maxSubmissions });
+              this.updateRemainingSubmissions();
+            }
+
             this.setData({ progress: 100, progressText: '评分完成！' });
             wx.showToast({ title: '提交成功', icon: 'success' });
 
@@ -251,6 +274,16 @@ Page({
               });
             }, 1500);
           } else {
+            // 检查是否是提交次数超限
+            if (res.result.code === 'SUBMISSION_LIMIT_EXCEEDED') {
+              wx.showModal({
+                title: '无法提交',
+                content: res.result.error,
+                showCancel: false
+              });
+              this.setData({ analyzing: false, remainingSubmissions: 0 });
+              return;
+            }
             wx.showToast({ title: res.result.error || '评分失败', icon: 'none' });
             this.setData({ analyzing: false });
           }

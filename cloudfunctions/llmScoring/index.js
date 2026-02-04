@@ -7,7 +7,7 @@ cloud.init({
 
 // LLM API 配置 (参考 run.py:16-20)
 const LLM_URL = "https://api.siliconflow.cn/v1/chat/completions";
-const LLM_MODEL = "deepseek-ai/DeepSeek-V3";
+const LLM_MODEL = "Qwen/Qwen3-8B";
 
 /**
  * 调用 SiliconFlow LLM 评分接口 (参考 run.py:106-116)
