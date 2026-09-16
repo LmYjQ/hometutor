@@ -10,7 +10,7 @@ cloud.init({
 const ASR_URL = 'https://api.siliconflow.cn/v1/audio/transcriptions';
 const ASR_MODEL =  'FunAudioLLM/SenseVoiceSmall' // 'TeleAI/TeleSpeechASR';
 const LLM_URL = 'https://api.siliconflow.cn/v1/chat/completions';
-const LLM_MODEL = 'Qwen/Qwen3-8B';
+const LLM_MODEL = 'Qwen/Qwen2.5-7B-Instruct'; // 非思考模型，对比评分这种短任务更快更稳
 
 const db = cloud.database();
 const _ = db.command;
@@ -45,6 +45,7 @@ async function getUserInfo(openid) {
  */
 async function downloadFileFromCloud(fileID) {
   console.log('[Download] 获取临时下载链接, fileID:', fileID);
+  const downloadStart = Date.now();
 
   const res = await cloud.getTempFileURL({
     fileList: [fileID],
@@ -61,31 +62,49 @@ async function downloadFileFromCloud(fileID) {
     method: 'get',
     url: tempUrl,
     responseType: 'arraybuffer',
-    timeout: 120000,
+    timeout: 15000, // 必须小于云函数超时(180s)，短文本视频一般几百 KB，下载应 <5s；超时说明网络异常
   });
 
-  console.log('[Download] 下载完成, 大小:', response.data.length);
+  console.log(`[Download] 下载完成, 大小: ${response.data.length} bytes, 耗时: ${Date.now() - downloadStart}ms`);
   return response.data;
 }
 
 /**
  * 调用 SiliconFlow ASR 接口
+ * @param {Buffer} audioBuffer - 文件字节流（可以是 m4a/wav/mp3 等纯音频，也可以是 mp4）
+ * @param {string} originalFileID - 原始 cloud:// fileID（用于推断 MIME）
  */
-async function callSiliconFlowASR(audioBuffer) {
+async function callSiliconFlowASR(audioBuffer, originalFileID) {
   const apiKey = process.env.SILICONFLOW_API_KEY;
   if (!apiKey) {
     throw new Error('未配置 SILICONFLOW_API_KEY');
   }
 
+  // 根据文件后缀推断 MIME 和推荐文件名，避免 SiliconFlow 拿到 mp4 当视频处理
+  const lower = (originalFileID || '').toLowerCase();
+  let filename = 'audio.mp3';
+  let contentType = 'audio/mpeg';
+  if (lower.endsWith('.m4a')) {
+    filename = 'audio.m4a';
+    contentType = 'audio/mp4';
+  } else if (lower.endsWith('.wav')) {
+    filename = 'audio.wav';
+    contentType = 'audio/wav';
+  } else if (lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.m4v')) {
+    filename = 'video.mp4';
+    contentType = 'video/mp4';
+  }
+
   const FormData = require('form-data');
   const form = new FormData();
   form.append('file', audioBuffer, {
-    filename: 'audio.mp3',
-    contentType: 'audio/mpeg',
+    filename,
+    contentType,
   });
   form.append('model', ASR_MODEL);
 
-  console.log('[ASR] 发送请求...');
+  console.log(`[ASR] 发送请求... filename=${filename}, contentType=${contentType}, size=${audioBuffer.length}`);
+  const asrStart = Date.now();
 
   try {
     const response = await axios.post(ASR_URL, form, {
@@ -93,10 +112,10 @@ async function callSiliconFlowASR(audioBuffer) {
         Authorization: `Bearer ${apiKey}`,
         ...form.getHeaders(),
       },
-      timeout: 180000,
+      timeout: 120000, // 必须小于云函数超时(180s)；ASR 在网络严重抽风时可能慢到分钟级，留足预算
     });
 
-    console.log('[ASR] 响应状态:', response.status);
+    console.log(`[ASR] 响应状态: ${response.status}, 耗时: ${Date.now() - asrStart}ms`);
 
     if (response.status === 200) {
       return response.data.text || '';
@@ -120,7 +139,7 @@ async function callSiliconFlowASR(audioBuffer) {
         throw new Error(`ASR API 错误(${status}): ${msg}`);
       }
     } else if (error.code === 'ECONNABORTED') {
-      throw new Error('ASR 请求超时: 服务器响应超过180秒');
+      throw new Error('ASR 请求超时: 服务器响应超过120秒');
     } else {
       throw new Error(`ASR 网络错误: ${error.message}`);
     }
@@ -154,6 +173,8 @@ async function callSiliconFlowLLM(referenceText, studentText) {
   console.log('[LLM] 标准答案长度:', referenceText.length);
   console.log('[LLM] 学生背诵长度:', studentText.length);
 
+  const llmStart = Date.now();
+
   try {
     const response = await axios.post(
       LLM_URL,
@@ -165,17 +186,21 @@ async function callSiliconFlowLLM(referenceText, studentText) {
         ],
         temperature: 0.1,
         response_format: { type: 'json_object' },
+        // Qwen3 系列默认开思考模式，会先生成长段思考再输出，
+        // 云函数 60s 内经常跑不完 → 关掉思考直接出 JSON
+        enable_thinking: false,
+        max_tokens: 500,
       },
       {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        timeout: 180000,
+        timeout: 30000, // 非思考模型 7B 短任务 <2s；30s 兜底（异常场景），必须小于云函数超时(180s)
       }
     );
 
-    console.log('[LLM] 响应状态:', response.status);
+    console.log(`[LLM] 响应状态: ${response.status}, 耗时: ${Date.now() - llmStart}ms`);
 
     if (response.status === 200) {
       const content = response.data.choices?.[0]?.message?.content;
@@ -210,7 +235,7 @@ async function callSiliconFlowLLM(referenceText, studentText) {
         throw new Error(`LLM API 错误(${status}): ${msg}`);
       }
     } else if (error.code === 'ECONNABORTED') {
-      throw new Error('LLM 请求超时: 服务器响应超过180秒');
+      throw new Error('LLM 请求超时: 服务器响应超过30秒');
     } else {
       throw new Error(`LLM 网络错误: ${error.message}`);
     }
@@ -270,6 +295,7 @@ exports.main = async (event, context) => {
         assignment_id: assignmentId,
         student_id: openid,
         student_name: user.name,
+        avatarUrl: user.avatarUrl || '',  // 顺手存头像，老师端批改视图能直接展示
         video_file_id: fileID,
         audio_text: '',
         score: 0,
@@ -286,9 +312,9 @@ exports.main = async (event, context) => {
     console.log('[Submit] 下载视频文件...');
     const videoBuffer = await downloadFileFromCloud(fileID);
 
-    // 5. 调用 ASR 语音识别
+    // 5. 调用 ASR 语音识别（asrStart 在 callSiliconFlowASR 内部计时）
     console.log('[Submit] 调用 ASR...');
-    const audioText = await callSiliconFlowASR(videoBuffer);
+    const audioText = await callSiliconFlowASR(videoBuffer, fileID);
     console.log('[Submit] ASR 识别结果:', audioText?.substring(0, 50));
 
     // 6. 调用 LLM 评分

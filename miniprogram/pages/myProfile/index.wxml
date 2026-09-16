@@ -10,9 +10,33 @@
 
   <!-- 菜单列表 -->
   <view class="menu-list">
-    <view class="menu-item" bindtap="switchIdentity" wx:if="{{userInfo.role}}">
+    <view class="menu-item" bindtap="editNickname">
+      <text class="menu-icon">✏️</text>
+      <text class="menu-text">修改昵称</text>
+      <text class="menu-arrow">></text>
+    </view>
+
+    <button class="menu-item avatar-menu"
+            open-type="chooseAvatar"
+            bindchooseavatar="onChooseAvatar"
+            disabled="{{uploadingAvatar}}">
+      <text class="menu-icon">🖼️</text>
+      <text class="menu-text">修改头像{{uploadingAvatar ? '（上传中...）' : ''}}</text>
+      <text class="menu-arrow">></text>
+    </button>
+
+    <view class="menu-item" bindtap="switchIdentity" wx:if="{{false}}">
       <text class="menu-icon">🔄</text>
       <text class="menu-text">切换身份 ({{roleText}})</text>
+      <text class="menu-arrow">></text>
+    </view>
+
+    <!-- 开发者专属：身份切换（仅 DEV_OPENID 可见） -->
+    <view class="menu-item dev-switch" wx:if="{{showSwitchRole}}"
+          bindtap="switchRole"
+          hover-class="menu-item-hover">
+      <text class="menu-icon">🧪</text>
+      <text class="menu-text">🧪 切换身份 (dev) ({{roleText}})</text>
       <text class="menu-arrow">></text>
     </view>
 

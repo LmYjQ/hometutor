@@ -6,7 +6,9 @@ App({
       //   env 参数决定接下来小程序发起的云开发调用（wx.cloud.xxx）会默认请求到哪个云环境的资源
       //   此处请填入环境 ID, 环境 ID 可打开云控制台查看
       //   如不填则使用默认环境（第一个创建的环境）
-      env: "hometutor-1gw067pt8eeae1ac",
+      env: "hometutor-dev-d2gz5nh53c67ecd73",
+      userInfo: null,
+      role: null
     };
     if (!wx.cloud) {
       console.error("请使用 2.2.3 或以上的基础库以使用云能力");
@@ -16,5 +18,23 @@ App({
         traceUser: true,
       });
     }
+
+    // 启动时尝试恢复登录态：从 wx.storage 同步到 globalData
+    // 这样首页 / 我的页进入时 globalData.userInfo 直接可用，不需要等 onShow 再读
+    const cached = wx.getStorageSync('userInfo');
+    if (cached && cached._openid && cached.role) {
+      this.globalData.userInfo = cached;
+      this.globalData.role = cached.role;
+    }
   },
+
+  // 提供一个全局方法：刷新用户信息（用于切换身份等场景后立即生效）
+  refreshUserInfo: function () {
+    const cached = wx.getStorageSync('userInfo');
+    if (cached) {
+      this.globalData.userInfo = cached;
+      this.globalData.role = cached.role || null;
+    }
+    return cached;
+  }
 });

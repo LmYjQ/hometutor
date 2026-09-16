@@ -1,4 +1,16 @@
 // 云函数 publishAssignment/index.js - 老师发布作业（从CSV/Excel文件解析）
+//
+// 入参：
+//   { classId, className, fileContent, fileType, batchTitle }
+//   - batchTitle: 本次作业的名字（必填，<=30 字符）
+//
+// 流程：
+//   1. 校验老师对该班级的所有权
+//   2. 校验 batchTitle 非空
+//   3. 解析 CSV/Excel
+//   4. 先创建一条 assignment_batches 记录
+//   5. 循环 add assignment 时写入 batch_id（反查指向）
+//   6. 更新 batch 的 assignment_ids + assignment_count
 const cloud = require('wx-server-sdk');
 cloud.init({
   env: cloud.DYNAMIC_CURRENT_ENV
@@ -11,10 +23,19 @@ const XLSX = require('xlsx');
 exports.main = async (event, context) => {
   const wxContext = cloud.getWXContext();
   const openid = wxContext.OPENID;
-  const { classId, fileContent, className, fileType } = event;
+  const { classId, fileContent, className, fileType, batchTitle } = event;
+
+  // ===== 1. 校验作业名（必填） =====
+  const cleanTitle = (batchTitle || '').trim();
+  if (!cleanTitle) {
+    return { success: false, error: '请填写本次作业的名字' };
+  }
+  if (cleanTitle.length > 30) {
+    return { success: false, error: '作业名不能超过 30 个字符' };
+  }
 
   try {
-    // 验证班级是否存在且属于该老师
+    // ===== 2. 验证班级归属 =====
     const classRes = await db.collection('classes')
       .where({ _id: classId, teacher_id: openid })
       .get();
@@ -25,15 +46,37 @@ exports.main = async (event, context) => {
 
     const classInfo = classRes.data[0];
 
-    // 根据文件类型解析内容
+    // ===== 3. 解析文件 =====
     let lines;
     if (fileType === 'excel') {
-      // 解析Excel文件（传入base64编码的buffer）
       lines = parseExcelContent(fileContent);
     } else {
-      // 默认解析CSV内容（支持多行引号字段）
       lines = parseCSVContent(fileContent);
     }
+
+    if (!lines || lines.length === 0) {
+      return { success: false, error: '文件解析为空，请检查文件内容' };
+    }
+
+    // ===== 4. 创建 batch 记录 =====
+    const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const batchDoc = {
+      _id: batchId,
+      class_id: classId,
+      class_name: className || classInfo.name,
+      teacher_id: openid,
+      teacher_name: classInfo.teacher_name || '',
+      title: cleanTitle,
+      assignment_ids: [],
+      assignment_count: 0,
+      status: 'active',
+      created_at: new Date(),
+      deleted_at: null
+    };
+    await db.collection('assignment_batches').add({ data: batchDoc });
+
+    // ===== 5. 循环 add assignment =====
+    const createdIds = [];
     const results = [];
 
     for (let i = 0; i < lines.length; i++) {
@@ -48,48 +91,55 @@ exports.main = async (event, context) => {
       const reference_text = fields[1].trim();
       const deadlineStr = fields[2].trim();
 
-      // 解析截止时间
+      // 解析截止时间（北京时间 +08:00）
       let deadline;
-      // 支持格式: 2026-06-01, 2026/06/01, 2026-06-01 12:00
       const dateMatch = deadlineStr.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:\s*(\d{1,2}):(\d{2}))?/);
       if (dateMatch) {
         const [, year, month, day, hour = '23', minute = '59'] = dateMatch;
-        deadline = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:${minute}:00.000Z`);
+        const localStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour.padStart(2, '0')}:${minute}:00+08:00`;
+        deadline = new Date(localStr);
       } else {
-        // 默认设置为30天后
         deadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       }
 
-      // 生成作业ID
-      const assignmentId = `assign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      // 创建作业记录
-      const assignment = {
-        _id: assignmentId,
-        class_id: classId,
-        class_name: className || classInfo.name,
-        teacher_id: openid,
-        question_title,
-        reference_text,
-        deadline,
-        status: 'active',
-        created_at: new Date()
-      };
+      const assignmentId = `assign_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 6)}`;
 
       await db.collection('assignments').add({
-        data: assignment
+        data: {
+          _id: assignmentId,
+          class_id: classId,
+          class_name: className || classInfo.name,
+          teacher_id: openid,
+          batch_id: batchId,            // ← 反查字段
+          question_title,
+          reference_text,
+          deadline,
+          status: 'active',
+          created_at: new Date()
+        }
       });
 
-      results.push({
-        success: true,
-        question_title,
-        assignmentId
+      createdIds.push(assignmentId);
+      results.push({ success: true, question_title, assignmentId });
+    }
+
+    // ===== 6. 回写 batch.assignment_ids + count =====
+    if (createdIds.length > 0) {
+      await db.collection('assignment_batches').doc(batchId).update({
+        data: {
+          assignment_ids: createdIds,
+          assignment_count: createdIds.length
+        }
       });
+    } else {
+      // 没有创建任何题目，回滚 batch
+      await db.collection('assignment_batches').doc(batchId).remove();
     }
 
     return {
       success: true,
       data: {
+        batchId,
         count: results.length,
         results
       },
@@ -103,10 +153,7 @@ exports.main = async (event, context) => {
 
 // 解析整个CSV内容，支持引号内的换行
 function parseCSVContent(content) {
-  // 数据清洗：移除首尾空白字符和多余的换行
   content = content.trim();
-
-  // 进一步清理：移除内容末尾可能存在的多个连续换行符
   content = content.replace(/\n+$/g, '');
 
   const lines = [];
@@ -118,7 +165,6 @@ function parseCSVContent(content) {
     const char = content[i];
 
     if (char === '"') {
-      // 检查是否是转义的引号 ("")
       if (inQuotes && content[i + 1] === '"') {
         field += '"';
         i++;
@@ -126,11 +172,9 @@ function parseCSVContent(content) {
         inQuotes = !inQuotes;
       }
     } else if (char === ',' && !inQuotes) {
-      // 字段分隔符
       currentLine.push(field);
       field = '';
     } else if ((char === '\n' || char === '\r') && !inQuotes) {
-      // 行结束
       if (char === '\r' && content[i + 1] === '\n') {
         i++;
       }
@@ -145,7 +189,6 @@ function parseCSVContent(content) {
     }
   }
 
-  // 处理最后一行
   if (field || currentLine.length > 0) {
     currentLine.push(field);
     if (currentLine.length > 0 && (currentLine.length > 1 || currentLine[0] !== '')) {
@@ -153,34 +196,25 @@ function parseCSVContent(content) {
     }
   }
 
-  // 最终清理：移除可能存在的空行（包括全是空白的行）
-  return lines.filter(line => {
-    // 检查行是否为空（所有字段都是空的或者只有空白字符）
-    return line.some(f => f.trim() !== '');
-  });
+  const cleaned = lines.filter(line => line.some(f => f.trim() !== ''));
+  // 跳过表头
+  return cleaned.slice(1);
 }
 
 // 解析Excel内容（支持包含换行的单元格）
 function parseExcelContent(base64Content) {
-  // 将base64转换为buffer
   const buffer = Buffer.from(base64Content, 'base64');
-
-  // 读取Excel文件
   const workbook = XLSX.read(buffer, { type: 'buffer' });
-
-  // 获取第一个工作表
   const firstSheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[firstSheetName];
-
-  // 转换为二维数组
   const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-  // 清理数据：移除空行
-  return data.filter(row => {
-    return row.some(cell => {
-      if (cell === undefined || cell === null) return false;
-      if (typeof cell === 'string') return cell.trim() !== '';
-      return true;
-    });
-  });
+  const cleaned = data.filter(row => row.some(cell => {
+    if (cell === undefined || cell === null) return false;
+    if (typeof cell === 'string') return cell.trim() !== '';
+    return true;
+  }));
+
+  // 跳过表头
+  return cleaned.slice(1);
 }

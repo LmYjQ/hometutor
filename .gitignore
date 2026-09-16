@@ -41,3 +41,7 @@ __tests__/
 # 其他临时文件
 *.tmp
 *.temp
+
+# quickstart 模板样板文件（不是项目代码）
+README.md
+uploadCloudFunction.sh

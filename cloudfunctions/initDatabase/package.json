@@ -1,0 +1,9 @@
+{
+  "name": "initDatabase",
+  "version": "1.0.0",
+  "description": "一键初始化云数据库（建集合 + seed 邀请码）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

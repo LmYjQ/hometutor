@@ -278,6 +278,53 @@
   margin-top: 12rpx;
 }
 
+.step-list {
+  margin-top: 20rpx;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8rpx 16rpx;
+}
+.step-item {
+  display: flex;
+  align-items: center;
+  font-size: 22rpx;
+  color: #999;
+  flex: 1 1 40%;
+  min-width: 240rpx;
+}
+.step-dot {
+  width: 28rpx;
+  height: 28rpx;
+  line-height: 28rpx;
+  text-align: center;
+  border-radius: 50%;
+  background: #f0f0f0;
+  color: #999;
+  font-size: 20rpx;
+  margin-right: 8rpx;
+}
+.step-item.active .step-dot {
+  background: #667eea;
+  color: #fff;
+  animation: pulseDot 1s infinite;
+}
+.step-item.active .step-label {
+  color: #667eea;
+  font-weight: 600;
+}
+.step-item.done .step-dot {
+  background: #13c2c2;
+  color: #fff;
+}
+.step-item.done .step-label {
+  color: #13c2c2;
+}
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.85; }
+}
+
 .history-section {
   margin: 30rpx;
   background: #fff;
@@ -331,3 +378,43 @@
   background: #fff7e6;
   color: #fa8c16;
 }
+
+/* === 入口按钮（默认未录制时显示） === */
+.entry-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  padding: 40rpx 30rpx;
+}
+.entry-btn {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 32rpx 30rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
+  border: 2rpx solid transparent;
+  transition: all 0.2s;
+}
+.entry-btn:active {
+  background: #f5f7fa;
+  border-color: #667eea;
+}
+.entry-icon {
+  font-size: 60rpx;
+  margin-bottom: 12rpx;
+}
+.entry-text {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 8rpx;
+}
+.entry-desc {
+  font-size: 24rpx;
+  color: #999;
+}
+.record-entry .entry-icon { color: #ff4d4f; }
+.album-entry .entry-icon { color: #13a363; }
+.file-entry .entry-icon { color: #1677ff; }

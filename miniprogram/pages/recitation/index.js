@@ -14,15 +14,26 @@ Page({
     isRecording: false,
     recordingTimer: null,
     recordTime: 0,
+    showCamera: false,         // 默认不显示摄像头，用户点「录制」才打开
     videoPath: '',
     videoSize: 0,
     uploading: false,
     analyzing: false,
     progress: 0,
     progressText: '准备中...',
+    // 分阶段步骤：抽音频 → 上传 → 语音识别 → AI评分
+    steps: [
+      { key: 'extract', label: '提取音频', status: 'pending' },
+      { key: 'upload',   label: '上传文件', status: 'pending' },
+      { key: 'asr',      label: '语音识别', status: 'pending' },
+      { key: 'llm',      label: 'AI 评分',  status: 'pending' }
+    ],
     historySubmissions: [],
     maxSubmissions: 0,
-    remainingSubmissions: -1
+    remainingSubmissions: -1,
+    // 已完成状态：最近一次成功提交的 submissionId（用于「返回查看已完成」）
+    lastSubmissionId: '',
+    lastSubmittedAt: 0
   },
 
   onLoad(options) {
@@ -34,7 +45,27 @@ Page({
   },
 
   onUnload() {
+    // 标记页面已卸载，防止 AI 评分云函数回调时调用 setData 触发警告
+    this._destroyed = true;
     this.stopRecording();
+  },
+
+  onShow() {
+    // 场景：submitRecitation 成功后 navigateTo 到结果页，再点左上角返回 → analyzing: true 残留
+    // 此时应该展示「✅ 已完成」而不是「AI评分中」
+    if (this.data.analyzing || this.data.uploading) {
+      console.log('[Recitation] onShow 清掉残留 loading，恢复到「已完成」');
+      this.setData({
+        uploading: false,
+        analyzing: false,
+        progress: 0,
+        progressText: ''
+      });
+    }
+    // 回来时刷新历史记录（结果页可能写了新提交）
+    if (this.data.assignmentId) {
+      this.loadHistory();
+    }
   },
 
   // 加载作业详情
@@ -197,22 +228,100 @@ Page({
       videoSize: 0,
       fileSizeText: '',
       progress: 0,
-      progressText: ''
+      progressText: '',
+      showCamera: false   // 关闭摄像头，回到入口按钮页
     });
   },
 
   // 从相册选择视频
+  // 用 wx.chooseMedia 而不是 wx.chooseVideo：
+  //   - chooseMedia 对视频文件做格式校验，能过滤掉不支持的格式（避免上传后才发现）
+  //   - chooseMedia 返回 tempFiles 数组（多选场景更通用）
+  // 配合防御性空数组判断，崩溃不会发生
   chooseFromAlbum() {
+    console.log('[chooseFromAlbum] 被点击，准备调 wx.chooseMedia');
     wx.chooseMedia({
       count: 1,
       mediaType: ['video'],
       sourceType: ['album'],
       success: (res) => {
-        const tempFilePath = res.tempFiles[0].tempFilePath;
-        const size = res.tempFiles[0].size;
+        console.log('[chooseFromAlbum] success 回调:', JSON.stringify({
+          tempFilesLen: res.tempFiles?.length,
+          firstFile: res.tempFiles?.[0]
+        }));
+        // 防御性：tempFiles 是空数组时（用户取消），静默 return，不报错
+        if (!res.tempFiles || res.tempFiles.length === 0) {
+          console.warn('[chooseFromAlbum] tempFiles 为空（用户取消）');
+          return;
+        }
+        const file = res.tempFiles[0];
+        const tempFilePath = file.tempFilePath || file.path;
+        if (!tempFilePath) {
+          console.error('[chooseFromAlbum] 拿不到视频路径:', file);
+          wx.showToast({ title: '视频选择失败', icon: 'none' });
+          return;
+        }
+        console.log('[chooseFromAlbum] 准备 setData, tempFilePath:', tempFilePath, 'size:', file.size, 'duration:', file.duration);
+        const size = file.size || 0;
+        const sizeMB = (size / 1024 / 1024).toFixed(2);
+        const duration = file.duration || 0;
+
+        // 大小限制（云函数限制100MB）
+        if (size > 100 * 1024 * 1024) {
+          wx.showToast({ title: '视频不能超过100MB', icon: 'none' });
+          return;
+        }
+        // 时长限制：超过 3 分钟的不要（ASR/LLM 处理时间会爆炸）
+        if (duration > 180) {
+          wx.showToast({ title: '视频时长超过3分钟，请精简', icon: 'none' });
+          return;
+        }
+
+        this.setData({
+          videoPath: tempFilePath,
+          videoSize: size,
+          fileSizeText: `${sizeMB} MB`
+        });
+        console.log('[chooseFromAlbum] setData 完成, videoPath:', this.data.videoPath);
+      },
+      fail: (err) => {
+        console.error('[chooseFromAlbum] fail 回调:', err);
+        // 用户主动取消时不弹错
+        if (err.errMsg && err.errMsg.includes('cancel')) return;
+        wx.showToast({ title: '选择视频失败', icon: 'none' });
+      },
+      complete: () => {
+        console.log('[chooseFromAlbum] complete');
+      }
+    });
+  },
+
+  // 从聊天文件选（专门应对 mp4 在系统相册被 wx.chooseMedia 过滤掉的场景）
+  // wx.chooseMessageFile 直接从微信聊天/收藏的文件面板选，不走相册过滤
+  chooseFromChatFile() {
+    console.log('[chooseFromChatFile] 被点击');
+    wx.chooseMessageFile({
+      count: 1,
+      type: 'video',           // 限制为视频类型
+      extension: ['mp4', 'mov', 'm4v', '3gp', 'avi'],
+      success: (res) => {
+        console.log('[chooseFromChatFile] success:', JSON.stringify({
+          tempFilesLen: res.tempFiles?.length,
+          firstFile: res.tempFiles?.[0]
+        }));
+        if (!res.tempFiles || res.tempFiles.length === 0) {
+          return;
+        }
+        const file = res.tempFiles[0];
+        const tempFilePath = file.path || file.tempFilePath;
+        if (!tempFilePath) {
+          console.error('[chooseFromChatFile] 拿不到路径:', file);
+          wx.showToast({ title: '文件读取失败', icon: 'none' });
+          return;
+        }
+        const size = file.size || 0;
         const sizeMB = (size / 1024 / 1024).toFixed(2);
 
-        // 检查大小限制 (云函数限制100MB)
         if (size > 100 * 1024 * 1024) {
           wx.showToast({ title: '视频不能超过100MB', icon: 'none' });
           return;
@@ -223,8 +332,19 @@ Page({
           videoSize: size,
           fileSizeText: `${sizeMB} MB`
         });
+        console.log('[chooseFromChatFile] setData 完成');
+      },
+      fail: (err) => {
+        console.error('[chooseFromChatFile] fail:', err);
+        if (err.errMsg && err.errMsg.includes('cancel')) return;
+        wx.showToast({ title: '选择失败', icon: 'none' });
       }
     });
+  },
+
+  // 用户点「录制视频」入口 → 打开摄像头
+  openCameraToRecord() {
+    this.setData({ showCamera: true });
   },
 
   // 提交背诵
@@ -234,71 +354,195 @@ Page({
       return;
     }
 
-    this.setData({ uploading: true, progress: 10, progressText: '上传视频中...' });
+    // 重置步骤状态
+    this.resetSteps();
+
+    this.setData({ uploading: true, progress: 5, progressText: '正在提取音频...' });
+    this.setStep('extract', 'active');
 
     try {
-      // 1. 上传视频到云存储
+      // 1. 优先尝试本地抽音频（m4a，几 KB~几十 KB），ASR 更快、计费更省
+      //    失败/不支持时降级用原 mp4，体验不崩
+      const extractStart = Date.now();
+      const audioPath = await this.extractAudioFromVideo(this.data.videoPath).catch((e) => {
+        console.warn('[Recitation] 本地抽音频失败，降级传 mp4:', e);
+        return null;
+      });
+      const audioSizeBytes = audioPath ? await this.getFileSize(audioPath) : 0;
+      console.log(`[Recitation] 抽音频${audioPath ? '成功' : '降级'}, 耗时 ${Date.now() - extractStart}ms, ${audioPath ? audioSizeBytes + ' bytes' : '用原视频'}`);
+
+      this.setStep('extract', 'done');
+
+      const uploadFilePath = audioPath || this.data.videoPath;
+      const uploadExt = audioPath ? 'm4a' : 'mp4';
+      const uploadContentType = audioPath ? 'audio/x-m4a' : 'video/mp4';
+
+      // 2. 上传到云存储
+      this.setStep('upload', 'active');
+      this.setData({ progress: 20, progressText: '上传文件中...' });
       const uploadRes = await wx.cloud.uploadFile({
-        cloudPath: `recitations/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.mp4`,
-        filePath: this.data.videoPath,
+        cloudPath: `recitations/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${uploadExt}`,
+        filePath: uploadFilePath,
         env: app.globalData.env
       });
+      console.log('文件上传成功:', uploadRes.fileID, 'type:', uploadContentType);
+      this.setStep('upload', 'done');
 
-      console.log('视频上传成功:', uploadRes.fileID);
-      this.setData({ progress: 40, progressText: '视频上传完成，AI分析中...' });
-
-      // 2. 调用AI评分云函数
+      // 3. 调云函数（云函数内部按顺序走 ASR → LLM）
+      //    前端不知道云函数内部分阶段细节，所以把 ASR/LLM 都标 active，
+      //    等拿到结果再统一标记 done
+      this.setStep('asr', 'active');
+      this.setStep('llm', 'active');
+      this.setData({ progress: 50, progressText: 'AI 评分中...' });
       this.setData({ uploading: false, analyzing: true });
 
-      wx.cloud.callFunction({
-        name: 'submitRecitation',
-        data: {
-          assignmentId: this.data.assignmentId,
-          fileID: uploadRes.fileID
-        },
-        success: (res) => {
-          if (res.result.success) {
-            // 更新最大提交次数配置
-            if (res.result.data.maxSubmissions) {
-              this.setData({ maxSubmissions: res.result.data.maxSubmissions });
-              this.updateRemainingSubmissions();
-            }
+      let res;
+      try {
+        res = await wx.cloud.callFunction({
+          name: 'submitRecitation',
+          data: {
+            assignmentId: this.data.assignmentId,
+            fileID: uploadRes.fileID,
+            contentType: uploadContentType
+          },
+          config: { timeout: 185000 }  // 185 秒，比云函数超时(180s)留 5s 缓冲，避免两端同时到时
+        });
+      } catch (err) {
+        console.error('AI评分失败:', err);
+        if (this._destroyed) return;
+        wx.showToast({ title: '评分超时或失败，请重试', icon: 'none' });
+        this.setData({ analyzing: false });
+        this.resetSteps();
+        return;
+      }
 
-            this.setData({ progress: 100, progressText: '评分完成！' });
-            wx.showToast({ title: '提交成功', icon: 'success' });
+      const result = res.result;
+      if (result.success) {
+        this.setStep('asr', 'done');
+        this.setStep('llm', 'done');
 
-            // 跳转到结果页面
-            setTimeout(() => {
-              wx.navigateTo({
-                url: `/pages/submissionResult/index?submissionId=${res.result.data.submissionId}`
-              });
-            }, 1500);
-          } else {
-            // 检查是否是提交次数超限
-            if (res.result.code === 'SUBMISSION_LIMIT_EXCEEDED') {
-              wx.showModal({
-                title: '无法提交',
-                content: res.result.error,
-                showCancel: false
-              });
-              this.setData({ analyzing: false, remainingSubmissions: 0 });
-              return;
-            }
-            wx.showToast({ title: res.result.error || '评分失败', icon: 'none' });
-            this.setData({ analyzing: false });
-          }
-        },
-        fail: (err) => {
-          console.error('AI评分失败:', err);
-          wx.showToast({ title: '评分失败，请重试', icon: 'none' });
-          this.setData({ analyzing: false });
+        // 更新最大提交次数配置
+        if (result.data.maxSubmissions) {
+          this.setData({ maxSubmissions: result.data.maxSubmissions });
+          this.updateRemainingSubmissions();
         }
-      });
+
+        this.setData({
+          analyzing: false,
+          uploading: false,
+          progress: 100,
+          progressText: '评分完成！',
+          lastSubmissionId: result.data.submissionId,
+          lastSubmittedAt: Date.now(),
+          videoPath: '',
+          videoSize: 0,
+          fileSizeText: ''
+        });
+        wx.showToast({ title: '提交成功', icon: 'success' });
+
+        setTimeout(() => {
+          wx.navigateTo({
+            url: `/pages/submissionResult/index?submissionId=${result.data.submissionId}`
+          });
+        }, 1500);
+      } else {
+        if (result.code === 'SUBMISSION_LIMIT_EXCEEDED') {
+          wx.showModal({
+            title: '无法提交',
+            content: result.error,
+            showCancel: false
+          });
+          this.setData({ analyzing: false, remainingSubmissions: 0 });
+          this.resetSteps();
+          return;
+        }
+        wx.showToast({ title: result.error || '评分失败', icon: 'none' });
+        this.setData({ analyzing: false });
+        this.resetSteps();
+      }
     } catch (err) {
       console.error('上传失败:', err);
       wx.showToast({ title: '上传失败，请重试', icon: 'none' });
       this.setData({ uploading: false });
+      this.resetSteps();
     }
+  },
+
+  // 把所有步骤重置为 pending
+  resetSteps() {
+    const steps = this.data.steps.map(s => ({ ...s, status: 'pending' }));
+    this.setData({ steps });
+  },
+
+  // 更新单个步骤状态：status = 'pending' | 'active' | 'done'
+  setStep(key, status) {
+    const steps = this.data.steps.map(s => s.key === key ? { ...s, status } : s);
+    this.setData({ steps });
+  },
+
+  // 用 MediaContainer 抽 mp4 的音频轨道 → m4a
+  // 失败/不支持时 throw，由调用方降级用原视频
+  extractAudioFromVideo(videoPath) {
+    return new Promise((resolve, reject) => {
+      if (!wx.createMediaContainer) {
+        reject(new Error('当前微信版本不支持 MediaContainer'));
+        return;
+      }
+      const container = wx.createMediaContainer();
+      container.extractDataSource({
+        source: videoPath,
+        success: (res) => {
+          console.log('[extractAudio] extractDataSource 完整返回:', JSON.stringify(res));
+          // 打印每条 track 的所有 key + type 值，方便诊断字段名到底是 audio/video 还是别的
+          const tracks = res.tracks || [];
+          console.log(`[extractAudio] 共 ${tracks.length} 条 track`);
+          tracks.forEach((t, idx) => {
+            console.log(`[extractAudio] track[${idx}]:`, JSON.stringify(t), 'typeof type =', typeof t.type);
+          });
+          // 兼容几种可能的 type 写法
+          const audioTrack = tracks.find(t =>
+            t.type === 'audio' ||
+            t.kind === 'audio' ||
+            t.trackType === 'audio'
+          );
+          if (!audioTrack) {
+            console.error('[extractAudio] 没找到 audio 轨道。可用 type 值:', JSON.stringify([...new Set(tracks.map(t => String(t.type)))])
+            );
+            reject(new Error('视频中找不到音频轨道'));
+            return;
+          }
+          container.addTrack(audioTrack);
+          container.export({
+            success: (exp) => {
+              console.log('[extractAudio] export success, tempFilePath:', exp.tempFilePath);
+              container.destroy();
+              resolve(exp.tempFilePath);
+            },
+            fail: (err) => {
+              console.error('[extractAudio] export fail:', err);
+              container.destroy();
+              reject(err);
+            }
+          });
+        },
+        fail: (err) => {
+          console.error('[extractAudio] extractDataSource fail:', err);
+          container.destroy();
+          reject(err);
+        }
+      });
+    });
+  },
+
+  // 拿临时文件大小（异步 wx.getFileInfo 包装）
+  getFileSize(filePath) {
+    return new Promise((resolve) => {
+      wx.getFileInfo({
+        filePath,
+        success: (res) => resolve(res.size || 0),
+        fail: () => resolve(0)
+      });
+    });
   },
 
   // 查看历史结果

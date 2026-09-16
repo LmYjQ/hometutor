@@ -1,0 +1,76 @@
+<view class="container">
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <!-- 顶部：学生 + 作业概览 -->
+  <view class="header" wx:if="{{!loading && studentInfo}}">
+    <view class="student-row">
+      <image class="avatar" src="{{studentInfo.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
+      <view class="info">
+        <text class="name">{{studentInfo.student_name}}</text>
+        <text class="sub">共提交 {{submissions.length}} 次</text>
+      </view>
+    </view>
+    <view class="summary">
+      <view class="summary-item">
+        <text class="num">{{bestScore}}</text>
+        <text class="label">最高分</text>
+      </view>
+      <view class="summary-item">
+        <text class="num">{{lastScore}}</text>
+        <text class="label">最近分</text>
+      </view>
+      <view class="summary-item">
+        <text class="num">{{submissions.length}}</text>
+        <text class="label">提交次数</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 提交历史 -->
+  <view class="history" wx:if="{{!loading && submissions.length > 0}}">
+    <view class="section-title">提交记录</view>
+    <view class="submission-card" wx:for="{{submissions}}" wx:key="_id">
+      <view class="card-header">
+        <text class="round">第 {{item.round}} 次</text>
+        <text class="time">{{item.createdAtText}}</text>
+        <view class="status {{item.status}}">{{item.statusText}}</view>
+      </view>
+
+      <view class="score-row">
+        <view class="score-circle {{item.score >= 80 ? 'good' : item.score >= 60 ? 'medium' : 'bad'}}">
+          {{item.score}}
+        </view>
+        <view class="audio-text">
+          <text class="audio-label">背诵内容</text>
+          <text class="audio-content">{{item.audioText || '（无）'}}</text>
+        </view>
+      </view>
+
+      <view class="comment" wx:if="{{item.comment}}">
+        <text class="comment-label">AI 评语</text>
+        <text class="comment-content">{{item.comment}}</text>
+      </view>
+
+      <view class="missing" wx:if="{{item.missingPoints && item.missingPoints.length > 0}}">
+        <text class="missing-label">遗漏点</text>
+        <view class="missing-tags">
+          <text class="missing-tag" wx:for="{{item.missingPoints}}" wx:for-item="mp" wx:key="*this">{{mp}}</text>
+        </view>
+      </view>
+
+      <view class="error-msg" wx:if="{{item.status === 'failed' && item.error}}">
+        <text class="error-label">失败原因</text>
+        <text class="error-content">{{item.error}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty" wx:if="{{!loading && submissions.length === 0}}">
+    <text class="empty-icon">📭</text>
+    <text class="empty-text">该学生还没有提交记录</text>
+  </view>
+</view>

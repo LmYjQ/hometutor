@@ -23,6 +23,41 @@ Page({
       this.setData({ userInfo });
     } else {
       wx.redirectTo({ url: '/pages/login/index' });
+      return;
+    }
+    // 后台静默刷新：从云函数拉一次最新 userInfo（覆盖掉本地可能 stale 的 role / name / avatarUrl）
+    this.refreshUserInfoFromCloud();
+  },
+
+  async refreshUserInfoFromCloud() {
+    const cached = this.data.userInfo;
+    if (!cached || !cached._openid) return;
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'login',
+        data: {
+          role: cached.role,
+          name: cached.name,
+          avatarUrl: cached.avatarUrl
+        }
+      });
+      if (res.result.success) {
+        const fresh = res.result.data;
+        app.globalData.userInfo = fresh;
+        wx.setStorageSync('userInfo', fresh);
+        this.setData({ userInfo: fresh });
+        // 如果 role 不一致（比如被另一个端切换过），跳到对应首页
+        if (fresh.role !== cached.role) {
+          wx.redirectTo({
+            url: fresh.role === 'teacher'
+              ? '/pages/teacherHome/index'
+              : '/pages/studentHome/index'
+          });
+        }
+      }
+    } catch (e) {
+      // 静默失败：本地缓存能用就行
+      console.log('[refreshUserInfo] 静默失败', e);
     }
   },
 

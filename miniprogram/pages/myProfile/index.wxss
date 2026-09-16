@@ -60,6 +60,21 @@
   border: none;
 }
 
+/* button 默认背景 + 圆角会破坏菜单视觉，这里把"修改头像"按钮
+   退化成跟普通 menu-item 完全一样的外观，只保留 open-type 能力 */
+.avatar-menu {
+  background: #fff !important;
+  border-radius: 0 !important;
+  color: #333;
+}
+.avatar-menu::after {
+  border: none;
+}
+.avatar-menu[disabled] {
+  color: #999;
+  opacity: 1; /* 微信 disabled 默认 0.6，这里保留文字清晰度 */
+}
+
 .menu-icon {
   font-size: 36rpx;
   margin-right: 20rpx;

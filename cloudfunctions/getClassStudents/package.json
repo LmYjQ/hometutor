@@ -1,0 +1,9 @@
+{
+  "name": "getClassStudents",
+  "version": "1.0.0",
+  "description": "老师端：根据 openid 列表批量查学生资料",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

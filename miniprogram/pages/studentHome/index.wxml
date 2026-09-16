@@ -28,21 +28,42 @@
     <text>{{debugInfo}}</text>
   </view>
 
-  <view class="assignment-list" wx:if="{{assignments.length > 0}}">
-    <view class="assignment-card" wx:for="{{assignments}}" wx:key="_id" bindtap="goToRecitation" data-id="{{item._id}}">
-      <view class="assignment-header">
-        <text class="class-name">{{item.class_name}}</text>
-        <text class="deadline" wx:if="{{item.isOverdue}}" style="color: #ff4d4f;">已截止</text>
-        <text class="deadline" wx:else>截止: {{item.deadlineText}}</text>
+  <!-- 批次化作业列表：每个批次可折叠，默认只展开最新 -->
+  <view class="batch-list" wx:if="{{batches.length > 0}}">
+    <view class="batch-card" wx:for="{{batches}}" wx:key="_id">
+      <view class="batch-header" bindtap="toggleBatch" data-id="{{item._id}}">
+        <view class="batch-title-area">
+          <text class="batch-icon">{{item.isLegacy ? '📦' : '📚'}}</text>
+          <view class="batch-text">
+            <text class="batch-title">{{item.title}}</text>
+            <text class="batch-meta">{{item.created_atText}} · {{item.assignment_count}} 题</text>
+          </view>
+        </view>
+        <text class="batch-chevron">{{expandedBatchIdsMap[item._id] ? '▼' : '▶'}}</text>
       </view>
-      <view class="assignment-title">{{item.question_title}}</view>
-      <view class="assignment-status" wx:if="{{item.submitted}}">
-        <text class="status-tag completed">已提交</text>
+
+      <view wx:if="{{expandedBatchIdsMap[item._id]}}" class="assignment-list">
+        <view class="assignment-card"
+              wx:for="{{item.assignments}}"
+              wx:for-item="as"
+              wx:key="_id"
+              bindtap="goToRecitation"
+              data-id="{{as._id}}">
+          <view class="assignment-header">
+            <text class="class-name">{{as.class_name}}</text>
+            <text class="deadline" wx:if="{{as.isOverdue}}" style="color: #ff4d4f;">已截止</text>
+            <text class="deadline" wx:else>截止: {{as.deadlineText}}</text>
+          </view>
+          <view class="assignment-title">{{as.question_title}}</view>
+          <view class="assignment-status" wx:if="{{as.submitted}}">
+            <text class="status-tag completed">已提交</text>
+          </view>
+        </view>
       </view>
     </view>
   </view>
 
-  <view class="empty-state" wx:else>
+  <view class="empty-state" wx:elif="{{!debugInfo}}">
     <text class="empty-icon">📝</text>
     <text class="empty-text">暂时没有待完成的作业</text>
   </view>

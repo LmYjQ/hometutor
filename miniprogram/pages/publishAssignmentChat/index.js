@@ -9,7 +9,8 @@ Page({
     inputValue: '',
     showFilePicker: false,
     uploading: false,
-    scrollIntoView: ''
+    scrollIntoView: '',
+    batchTitle: ''    // 当前预览消息里的作业名（必填，发布前要填）
   },
 
   onLoad(options) {
@@ -51,7 +52,16 @@ Page({
       type: 'file',
       extension: ['csv', 'xlsx', 'xls'],
       success: (res) => {
+        // 防御性：用户取消时 tempFiles 是空数组
+        if (!res.tempFiles || res.tempFiles.length === 0) {
+          return;
+        }
         const tempFile = res.tempFiles[0];
+        if (!tempFile || !tempFile.name) {
+          console.error('[onChooseImage] 文件对象异常:', tempFile);
+          wx.showToast({ title: '文件读取失败', icon: 'none' });
+          return;
+        }
         const fileName = tempFile.name.toLowerCase();
         if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
           this.readExcelFile(tempFile);
@@ -208,12 +218,38 @@ Page({
       return;
     }
 
-    // 判断是Excel还是CSV
-    if (lastMsg.previewData.isExcel) {
-      this.publishExcelAssignments();
-    } else {
-      this.publishAssignments(lastMsg.previewData.content);
-    }
+    // 强制要求输入作业名（必填，<=30 字符）
+    wx.showModal({
+      title: '为本次作业起个名字',
+      editable: true,
+      placeholderText: '例如：古诗词第3周',
+      content: this.data.batchTitle || '',
+      confirmText: '确认发布',
+      success: (res) => {
+        if (!res.confirm) return;
+        const title = (res.content || '').trim();
+        if (!title) {
+          wx.showToast({ title: '请填写作业名', icon: 'none' });
+          // 递归一次，让用户能继续填
+          setTimeout(() => this.confirmPublish(), 600);
+          return;
+        }
+        if (title.length > 30) {
+          wx.showToast({ title: '作业名不能超过 30 字符', icon: 'none' });
+          setTimeout(() => this.confirmPublish(), 600);
+          return;
+        }
+        this.setData({ batchTitle: title });
+        if (lastMsg.previewData.isExcel) {
+          this.publishExcelAssignments();
+        } else {
+          this.publishAssignments(lastMsg.previewData.content);
+        }
+      },
+      fail: () => {
+        wx.showToast({ title: '取消发布', icon: 'none' });
+      }
+    });
   },
 
   publishAssignments(csvContent) {
@@ -227,15 +263,17 @@ Page({
         classId: this.data.classId,
         className: this.data.className,
         fileContent: csvContent,
-        fileType: 'csv'
+        fileType: 'csv',
+        batchTitle: this.data.batchTitle
       },
       success: (res) => {
         if (res.result.success) {
           const { count } = res.result.data;
           this.addMessage({
             type: 'assistant',
-            content: `✅ 成功发布 ${count} 个作业！\n\n作业已添加到班级中，学生可以看到并提交背诵视频。`
+            content: `✅ 成功发布「${this.data.batchTitle}」批次，含 ${count} 个作业！\n\n作业已添加到班级中，学生可以看到并提交背诵视频。`
           });
+          this.setData({ batchTitle: '' });
         } else {
           this.addMessage({
             type: 'assistant',
@@ -277,15 +315,17 @@ Page({
         classId: this.data.classId,
         className: this.data.className,
         fileContent: this.tempExcelBase64,
-        fileType: 'excel'
+        fileType: 'excel',
+        batchTitle: this.data.batchTitle
       },
       success: (res) => {
         if (res.result.success) {
           const { count } = res.result.data;
           this.addMessage({
             type: 'assistant',
-            content: `✅ 成功发布 ${count} 个作业！\n\n作业已添加到班级中，学生可以看到并提交背诵视频。`
+            content: `✅ 成功发布「${this.data.batchTitle}」批次，含 ${count} 个作业！\n\n作业已添加到班级中，学生可以看到并提交背诵视频。`
           });
+          this.setData({ batchTitle: '' });
         } else {
           this.addMessage({
             type: 'assistant',

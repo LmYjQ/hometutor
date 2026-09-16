@@ -3,30 +3,66 @@
     <view class="class-name">{{classInfo.name}}</view>
     <view class="class-meta">
       <text class="invite-code">邀请码: {{classInfo.invite_code}}</text>
-      <text class="student-count" bindtap="toggleStudents">{{classInfo.student_ids.length}} 名学生</text>
+      <text class="student-count" bindtap="toggleStudents">
+        {{students.length}} 名学生
+        <text class="toggle">{{showStudents ? '▾' : '▸'}}</text>
+      </text>
     </view>
     <button class="copy-btn" bindtap="copyInviteCode">复制邀请码</button>
     <button class="publish-btn" bindtap="publishAssignment">发布作业</button>
   </view>
 
-  <!-- 学生列表 -->
-  <view class="student-list" wx:if="{{showStudents && classInfo.student_ids.length > 0}}">
-    <view class="student-item" wx:for="{{classInfo.student_ids}}" wx:key="index">
-      {{item}}
+  <!-- 学生列表（折叠） -->
+  <view class="student-list" wx:if="{{showStudents && students.length > 0}}">
+    <view class="student-card" wx:for="{{students}}" wx:key="student_id">
+      <image class="avatar" src="{{item.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
+      <view class="info">
+        <text class="name">{{item.name}}</text>
+        <text class="openid">{{item.student_id}}</text>
+      </view>
     </view>
   </view>
+  <view class="student-empty" wx:elif="{{showStudents}}">
+    <text>还没有学生加入</text>
+  </view>
 
-  <view class="section-title">作业历史</view>
+  <view class="section-title">作业批次</view>
 
-  <view class="assignment-list" wx:if="{{assignments.length > 0}}">
-    <view class="assignment-card" wx:for="{{assignments}}" wx:key="_id" bindtap="goToAssignmentDetail" data-id="{{item._id}}">
-      <view class="assignment-header">
-        <text class="question-title">{{item.question_title}}</text>
-        <text class="status" style="color: {{item.status === 'active' ? '#13c2c2' : '#999'}}">{{item.statusText}}</text>
+  <view class="batch-list" wx:if="{{batches.length > 0}}">
+    <view class="batch-card" wx:for="{{batches}}" wx:key="_id">
+      <!-- 批次头部：可点击折叠/展开 -->
+      <view class="batch-header" bindtap="toggleBatch" data-id="{{item._id}}">
+        <view class="batch-title-area">
+          <text class="batch-icon">{{item.isLegacy ? '📦' : '📚'}}</text>
+          <view class="batch-text">
+            <text class="batch-title">{{item.title}}</text>
+            <text class="batch-meta">{{item.created_atText}} · {{item.assignment_count}} 题</text>
+          </view>
+        </view>
+        <view class="batch-actions">
+          <!-- 删除入口（非 legacy 才显示，legacy 不让删） -->
+          <view wx:if="{{!item.isLegacy}}" class="batch-menu-btn" catchtap="onBatchMenu" data-id="{{item._id}}" data-title="{{item.title}}">⋯</view>
+          <text class="batch-chevron">{{expandedBatchIdsMap[item._id] ? '▼' : '▶'}}</text>
+        </view>
       </view>
-      <view class="assignment-meta">
-        <text class="deadline">截止: {{item.deadlineText}}</text>
-        <text class="stats">{{item.submissionCount}} 人已提交</text>
+
+      <!-- 题目列表（折叠/展开） -->
+      <view wx:if="{{expandedBatchIdsMap[item._id]}}" class="assignment-list">
+        <view class="assignment-card"
+              wx:for="{{item.assignments}}"
+              wx:for-item="as"
+              wx:key="_id"
+              bindtap="goToAssignmentDetail"
+              data-id="{{as._id}}">
+          <view class="assignment-header">
+            <text class="question-title">{{as.question_title}}</text>
+            <text class="status" style="color: {{as.status === 'active' ? '#13c2c2' : '#999'}}">{{as.statusText}}</text>
+          </view>
+          <view class="assignment-meta">
+            <text class="deadline">截止: {{as.deadlineText}}</text>
+            <text class="stats">{{as.submissionCount}}/{{as.studentCount}} 人已提交</text>
+          </view>
+        </view>
       </view>
     </view>
   </view>
@@ -34,6 +70,14 @@
   <view class="empty-state" wx:else>
     <text class="empty-icon">📋</text>
     <text class="empty-text">还没有布置作业</text>
-    <text class="empty-desc">请在后台管理系统发布作业</text>
+    <text class="empty-desc">点上方「发布作业」开始</text>
   </view>
+
+  <!-- 批次操作菜单（action sheet） -->
+  <action-sheet hidden="{{!showBatchMenu}}" bindchange="onBatchMenuChange">
+    <action-sheet-item bindtap="onConfirmDeleteBatch" data-id="{{menuBatchId}}" data-title="{{menuBatchTitle}}">
+      <text style="color:#ff4d4f;">🗑️ 删除本批次</text>
+    </action-sheet-item>
+    <action-sheet-cancel>取消</action-sheet-cancel>
+  </action-sheet>
 </view>

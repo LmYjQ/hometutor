@@ -7,9 +7,12 @@ Page({
     className: '',
     loading: true,
     assignment: null,
-    studentStats: [],
+    studentStats: [],          // 已提交学生
+    notSubmittedStudents: [],  // 未提交学生
     submittedCount: 0,
-    totalStudentCount: 0
+    notSubmittedCount: 0,
+    totalStudentCount: 0,
+    showNotSubmitted: false    // 默认折叠未提交列表
   },
 
   onLoad(options) {
@@ -30,8 +33,15 @@ Page({
       data: { assignmentId: this.data.assignmentId },
       success: (res) => {
         if (res.result.success) {
-          const { assignment, studentStats, submittedCount, totalStudentCount } = res.result.data;
-          // 格式化截止时间
+          const {
+            assignment,
+            studentStats,
+            notSubmittedStudents,
+            submittedCount,
+            notSubmittedCount,
+            totalStudentCount
+          } = res.result.data;
+
           const deadline = new Date(assignment.deadline);
           const deadlineText = this.formatDate(deadline);
 
@@ -42,7 +52,9 @@ Page({
               statusText: assignment.status === 'active' ? '进行中' : '已结束'
             },
             studentStats,
+            notSubmittedStudents,
             submittedCount,
+            notSubmittedCount,
             totalStudentCount,
             loading: false
           });
@@ -67,19 +79,17 @@ Page({
     return `${month}月${day}日 ${hours}:${minutes}`;
   },
 
+  // 折叠/展开未提交学生
+  toggleNotSubmitted() {
+    this.setData({ showNotSubmitted: !this.data.showNotSubmitted });
+  },
+
+  // 点学生卡片 → 跳学生提交详情
+  // 注意：之前是 wx.showModal 提示，体验差；现在直接跳转（页面已存在）
   viewStudentSubmissions(e) {
     const { studentId, studentName } = e.currentTarget.dataset;
-    wx.showModal({
-      title: studentName,
-      content: '可进入学生详情页查看该学生的所有提交记录',
-      confirmText: '查看详情',
-      success: (res) => {
-        if (res.confirm) {
-          wx.navigateTo({
-            url: `/pages/studentSubmissionDetail/index?assignmentId=${this.data.assignmentId}&studentId=${studentId}&studentName=${studentName}`
-          });
-        }
-      }
+    wx.navigateTo({
+      url: `/pages/studentSubmissionDetail/index?assignmentId=${this.data.assignmentId}&studentId=${studentId}&studentName=${studentName}`
     });
   }
 });

@@ -73,10 +73,14 @@ exports.main = async (event, context) => {
 
 exports.formatDate = function(timestamp) {
   if (!timestamp) return '';
+  // 云数据库返回 ISO 字符串（UTC），云函数运行环境也是 UTC
+  // 必须 +8 小时转为北京时间显示，否则会差 8 小时
   const date = new Date(timestamp);
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
+  const beijingMs = date.getTime() + 8 * 60 * 60 * 1000;
+  const beijing = new Date(beijingMs);
+  const month = beijing.getUTCMonth() + 1;
+  const day = beijing.getUTCDate();
+  const hours = beijing.getUTCHours();
+  const minutes = beijing.getUTCMinutes();
   return `${month}月${day}日 ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 };

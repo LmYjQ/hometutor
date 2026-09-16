@@ -9,7 +9,8 @@ Page({
     tempRole: 'student',
     tempNickName: '',
     tempAvatarUrl: '',
-    tempInviteCode: ''
+    tempInviteCode: '',
+    uploadingAvatar: false
   },
 
   onLoad() {
@@ -57,7 +58,8 @@ Page({
       tempRole: role,
       tempNickName: '',
       tempAvatarUrl: '',
-      tempInviteCode: ''
+      tempInviteCode: '',
+      uploadingAvatar: false
     });
   },
 
@@ -66,15 +68,45 @@ Page({
     this.setData({ showUserInfoModal: false });
   },
 
-  // 选择头像
-  chooseAvatar() {
-    wx.chooseImage({
-      count: 1,
-      success: (res) => {
-        const tempFilePaths = res.tempFilePaths;
-        this.setData({ tempAvatarUrl: tempFilePaths[0] });
-      }
+  // 微信选择头像（button open-type="chooseAvatar" 的回调）
+  // 注意：返回的 avatarUrl 是 wxfile:// 临时路径，必须立刻上传到云存储，
+  // 否则下次冷启动就失效。传失败就让用户重试，不让进 confirmLogin。
+  async onChooseAvatar(e) {
+    const tempPath = e.detail.avatarUrl;
+    if (!tempPath) return;
+
+    this.setData({ uploadingAvatar: true });
+    try {
+      const fileID = await this.uploadAvatar(tempPath);
+      this.setData({ tempAvatarUrl: fileID });
+      wx.showToast({ title: '头像已上传', icon: 'success', duration: 800 });
+    } catch (err) {
+      console.error('上传头像失败:', err);
+      wx.showToast({ title: '头像上传失败，请重试', icon: 'none' });
+    } finally {
+      this.setData({ uploadingAvatar: false });
+    }
+  },
+
+  /**
+   * 把本地临时路径上传到云存储，返回永久 fileID
+   * 路径：avatar/<openid>_<timestamp>.jpg（用 openid 防止同名覆盖冲突，
+   *       同一用户再次上传会留下旧文件，不主动删除以避免影响加载）
+   */
+  async uploadAvatar(tempPath) {
+    const openid = wx.getStorageSync('openid') || 'anon';
+    const ext = (tempPath.match(/\.(\w{2,5})$/) || ['', 'jpg'])[1];
+    const cloudPath = `avatar/${openid}_${Date.now()}.${ext}`;
+
+    const res = await wx.cloud.uploadFile({
+      cloudPath,
+      filePath: tempPath
     });
+
+    if (!res.fileID) {
+      throw new Error('uploadFile 返回空 fileID');
+    }
+    return res.fileID;
   },
 
   // 昵称输入
@@ -94,13 +126,16 @@ Page({
 
   // 确认登录
   async confirmLogin() {
-    const { tempRole, tempNickName, tempAvatarUrl, tempInviteCode } = this.data;
+    const { tempRole, tempNickName, tempAvatarUrl, tempInviteCode, uploadingAvatar } = this.data;
 
+    if (uploadingAvatar) {
+      wx.showToast({ title: '头像还在上传中', icon: 'none' });
+      return;
+    }
     if (!tempNickName.trim()) {
       wx.showToast({ title: '请输入昵称', icon: 'none' });
       return;
     }
-
     if (tempRole === 'teacher' && !tempInviteCode.trim()) {
       wx.showToast({ title: '请输入邀请码', icon: 'none' });
       return;

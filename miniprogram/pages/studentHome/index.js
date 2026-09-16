@@ -4,7 +4,9 @@ const app = getApp();
 Page({
   data: {
     userInfo: {},
-    assignments: [],
+    assignments: [],          // 兼容旧 UI（暂不用，保留）
+    batches: [],              // 批次化作业列表（UI 用这个）
+    expandedBatchIdsMap: {},  // { batchId: true } 当前展开的批次
     classes: [],
     classCount: 0,
     pendingCount: 0,
@@ -22,6 +24,38 @@ Page({
       this.setData({ userInfo });
     } else {
       wx.redirectTo({ url: '/pages/login/index' });
+      return;
+    }
+    this.refreshUserInfoFromCloud();
+  },
+
+  async refreshUserInfoFromCloud() {
+    const cached = this.data.userInfo;
+    if (!cached || !cached._openid) return;
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'login',
+        data: {
+          role: cached.role,
+          name: cached.name,
+          avatarUrl: cached.avatarUrl
+        }
+      });
+      if (res.result.success) {
+        const fresh = res.result.data;
+        app.globalData.userInfo = fresh;
+        wx.setStorageSync('userInfo', fresh);
+        this.setData({ userInfo: fresh });
+        if (fresh.role !== cached.role) {
+          wx.redirectTo({
+            url: fresh.role === 'teacher'
+              ? '/pages/teacherHome/index'
+              : '/pages/studentHome/index'
+          });
+        }
+      }
+    } catch (e) {
+      console.log('[refreshUserInfo] 静默失败', e);
     }
   },
 
@@ -32,24 +66,28 @@ Page({
       data: {},
       success: (res) => {
         wx.hideLoading();
-        console.log('getStudentTodoList 返回:', res.result);
         if (res.result.success) {
-          const { assignments, classes } = res.result.data;
+          const { assignments, batches, classes } = res.result.data;
           const debug = res.result.debug || {};
-          const pendingCount = assignments.filter(a => !a.submitted).length;
+
+          // 第一次进入时，只展开最新批次
+          const expandedBatchIdsMap = {};
+          if (batches && batches.length > 0) {
+            expandedBatchIdsMap[batches[0]._id] = true;
+          }
+
+          const pendingCount = (assignments || []).filter(a => !a.submitted).length;
 
           let debugInfo = '';
-          if (assignments.length === 0) {
-            if (debug.message) {
-              debugInfo = debug.message;
-            }
-            if (debug.classIds) {
-              debugInfo += `\n查询的班级ID: ${debug.classIds.join(', ')}`;
-            }
+          if (!assignments || assignments.length === 0) {
+            if (debug.message) debugInfo = debug.message;
+            if (debug.classIds) debugInfo += `\n查询的班级ID: ${debug.classIds.join(', ')}`;
           }
 
           this.setData({
-            assignments,
+            assignments: assignments || [],
+            batches: batches || [],
+            expandedBatchIdsMap,
             classes,
             classCount: classes.length,
             pendingCount,
@@ -58,12 +96,8 @@ Page({
         } else {
           const debug = res.result.debug || {};
           let errorMsg = res.result.error || '获取失败';
-          if (debug.openid) {
-            errorMsg += `\nopenid: ${debug.openid}`;
-          }
-          if (debug.step) {
-            errorMsg += `\n失败步骤: ${debug.step}`;
-          }
+          if (debug.openid) errorMsg += `\nopenid: ${debug.openid}`;
+          if (debug.step) errorMsg += `\n失败步骤: ${debug.step}`;
           this.setData({ debugInfo: errorMsg });
         }
       },
@@ -78,6 +112,18 @@ Page({
   refreshAssignments() {
     this.setData({ debugInfo: '' });
     this.loadData();
+  },
+
+  // 折叠 / 展开批次
+  toggleBatch(e) {
+    const id = e.currentTarget.dataset.id;
+    const map = { ...this.data.expandedBatchIdsMap };
+    if (map[id]) {
+      delete map[id];
+    } else {
+      map[id] = true;
+    }
+    this.setData({ expandedBatchIdsMap: map });
   },
 
   goToJoinClass() {

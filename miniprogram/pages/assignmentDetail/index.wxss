@@ -1,26 +1,26 @@
 .container {
   min-height: 100vh;
   background: #f5f7fa;
+  padding-bottom: 60rpx;
 }
 
-.loading {
+.loading,
+.empty {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
-  padding: 100rpx 0;
+  padding: 120rpx 0;
 }
+.loading-text { color: #999; font-size: 28rpx; }
+.empty-icon { font-size: 80rpx; margin-bottom: 20rpx; }
+.empty-text { color: #999; font-size: 28rpx; }
 
-.loading-text {
-  font-size: 28rpx;
-  color: #666;
-}
-
+/* === 作业信息 === */
 .assignment-header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 30rpx;
   color: #fff;
+  padding: 40rpx 30rpx;
 }
-
 .class-tag {
   display: inline-block;
   background: rgba(255,255,255,0.2);
@@ -29,56 +29,55 @@
   font-size: 22rpx;
   margin-bottom: 16rpx;
 }
-
 .question {
   font-size: 36rpx;
-  font-weight: 600;
-  line-height: 1.5;
-  margin-bottom: 16rpx;
+  font-weight: bold;
+  line-height: 1.4;
+  margin-bottom: 20rpx;
 }
-
 .meta {
   display: flex;
-  gap: 30rpx;
+  justify-content: space-between;
   font-size: 24rpx;
   opacity: 0.9;
 }
 
-.submissions-section {
-  padding: 30rpx;
-}
-
+/* === 共用区段标题 === */
 .section-title {
-  font-size: 30rpx;
-  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 28rpx;
   color: #333;
-  margin-bottom: 20rpx;
+  font-weight: bold;
+  margin: 30rpx 30rpx 16rpx;
+}
+.toggle {
+  font-size: 28rpx;
+  color: #999;
+  font-weight: normal;
 }
 
+/* === 学生卡片 === */
 .submission-list {
+  margin: 0 30rpx;
+}
+.submission-card {
   background: #fff;
   border-radius: 16rpx;
-  overflow: hidden;
-}
-
-.submission-card {
+  padding: 24rpx;
+  margin-bottom: 16rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24rpx 30rpx;
-  border-bottom: 1rpx solid #f0f0f0;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.04);
 }
-
-.submission-card:last-child {
-  border-bottom: none;
-}
+.not-submitted { opacity: 0.7; }
 
 .student-info {
   display: flex;
   align-items: center;
-  flex: 1;
 }
-
 .avatar {
   width: 80rpx;
   height: 80rpx;
@@ -86,109 +85,20 @@
   background: #f0f0f0;
   margin-right: 20rpx;
 }
+.info { display: flex; flex-direction: column; }
+.name { font-size: 28rpx; color: #333; font-weight: 500; }
+.submit-count { font-size: 22rpx; color: #999; margin-top: 6rpx; }
+.missing-text { color: #ff7a45; }
 
-.info {
-  display: flex;
-  flex-direction: column;
-}
-
-.info .name {
-  font-size: 28rpx;
-  color: #333;
-  font-weight: 500;
-}
-
-.info .time {
-  font-size: 22rpx;
-  color: #999;
-  margin-top: 4rpx;
-}
-
-.info .submit-count {
-  font-size: 22rpx;
-  color: #13c2c2;
-  margin-top: 4rpx;
-}
-
+/* 分数徽章 */
 .best-score {
-  font-size: 28rpx;
-  font-weight: 600;
-  padding: 8rpx 20rpx;
-  border-radius: 8rpx;
-}
-
-.best-score.good {
-  background: #f6ffed;
-  color: #52c41a;
-}
-
-.best-score.medium {
-  background: #fffbe6;
-  color: #faad14;
-}
-
-.best-score.bad {
-  background: #fff2f0;
-  color: #ff4d4f;
-}
-
-.score-info {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.score {
-  font-size: 32rpx;
-  font-weight: 600;
+  background: #f0f0f0;
+  color: #666;
   padding: 8rpx 16rpx;
-  border-radius: 8rpx;
+  border-radius: 20rpx;
+  font-size: 24rpx;
 }
-
-.score.good {
-  background: #f6ffed;
-  color: #52c41a;
-}
-
-.score.medium {
-  background: #fffbe6;
-  color: #faad14;
-}
-
-.score.bad {
-  background: #fff2f0;
-  color: #ff4d4f;
-}
-
-.status {
-  font-size: 22rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 8rpx;
-}
-
-.status.graded {
-  background: #e6fffb;
-  color: #13c2c2;
-}
-
-.status.pending {
-  background: #fff7e6;
-  color: #fa8c16;
-}
-
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 100rpx 0;
-}
-
-.empty-icon {
-  font-size: 100rpx;
-  margin-bottom: 20rpx;
-}
-
-.empty-text {
-  font-size: 28rpx;
-  color: #999;
-}
+.best-score.good { background: #e6f7ee; color: #13a363; }
+.best-score.medium { background: #fff7e6; color: #d4880a; }
+.best-score.bad { background: #ffeded; color: #ff4d4f; }
+.best-score.zero { background: #f5f5f5; color: #bbb; }

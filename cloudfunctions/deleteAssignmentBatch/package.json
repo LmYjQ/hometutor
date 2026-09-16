@@ -1,0 +1,9 @@
+{
+  "name": "deleteAssignmentBatch",
+  "version": "1.0.0",
+  "description": "软删除作业批次",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

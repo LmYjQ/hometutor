@@ -14,16 +14,21 @@
     </view>
   </view>
 
-  <!-- 学生提交统计列表 -->
+  <!-- 已提交学生 -->
   <view class="submissions-section" wx:if="{{!loading && studentStats.length > 0}}">
-    <view class="section-title">学生提交统计</view>
+    <view class="section-title">已提交（{{submittedCount}} 人）</view>
     <view class="submission-list">
-      <view class="submission-card" wx:for="{{studentStats}}" wx:key="student_id" bindtap="viewStudentSubmissions" data-student-id="{{item.student_id}}" data-student-name="{{item.student_name}}">
+      <view class="submission-card"
+            wx:for="{{studentStats}}"
+            wx:key="student_id"
+            bindtap="viewStudentSubmissions"
+            data-student-id="{{item.student_id}}"
+            data-student-name="{{item.student_name}}">
         <view class="student-info">
           <image class="avatar" src="{{item.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
           <view class="info">
             <text class="name">{{item.student_name}}</text>
-            <text class="submit-count">提交 {{item.submissionCount}} 次</text>
+            <text class="submit-count">提交 {{item.submissionCount}} 次 · 最近 {{item.lastScore}} 分</text>
           </view>
         </view>
         <view class="score-info">
@@ -35,9 +40,33 @@
     </view>
   </view>
 
-  <!-- 空状态 - 无提交 -->
-  <view class="empty" wx:if="{{!loading && studentStats.length === 0}}">
+  <!-- 未提交学生（折叠区） -->
+  <view class="not-submitted-section" wx:if="{{!loading && notSubmittedStudents.length > 0}}">
+    <view class="section-title" bindtap="toggleNotSubmitted">
+      <text>未提交（{{notSubmittedStudents.length}} 人）</text>
+      <text class="toggle">{{showNotSubmitted ? '▾' : '▸'}}</text>
+    </view>
+    <view class="submission-list" wx:if="{{showNotSubmitted}}">
+      <view class="submission-card not-submitted"
+            wx:for="{{notSubmittedStudents}}"
+            wx:key="student_id">
+        <view class="student-info">
+          <image class="avatar" src="{{item.avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill"></image>
+          <view class="info">
+            <text class="name">{{item.student_name}}</text>
+            <text class="submit-count missing-text">尚未提交</text>
+          </view>
+        </view>
+        <view class="score-info">
+          <view class="best-score zero">—</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 - 完全没人提交 -->
+  <view class="empty" wx:if="{{!loading && studentStats.length === 0 && notSubmittedStudents.length === 0}}">
     <text class="empty-icon">📭</text>
-    <text class="empty-text">暂时还没有学生提交</text>
+    <text class="empty-text">班级还没有学生</text>
   </view>
 </view>
