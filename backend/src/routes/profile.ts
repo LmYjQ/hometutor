@@ -3,7 +3,9 @@ import { z } from 'zod'
 
 const updateSchema = z.object({
   name: z.string().min(1).max(20).optional(),
-  avatarUrl: z.string().url().optional(),
+  // 阶段 1：avatarUrl 可能是 CloudBase fileID（cloud://...），不强制 URL
+  // 阶段 3 切 MinIO 后再加 url() 校验
+  avatarUrl: z.string().optional(),
   role: z.enum(['teacher', 'student']).optional(),
   inviteCode: z.string().optional(),
 })
@@ -12,6 +14,32 @@ const updateSchema = z.object({
 const DEV_OPENIDS = ['oiVIk7edZTVoBqYBkMAIU6PixJDk']
 
 export default async function (fastify: FastifyInstance) {
+  // ============== 当前用户信息（用 JWT 拿，不要 code）==============
+  // 用于「静默刷新」场景：页面 onShow 想从后端拉一次最新 userInfo，
+  // 但不能再调 /api/auth/login（那个需要 wx.login() 拿 code）
+  fastify.get(
+    '/profile/me',
+    { preHandler: [fastify.authenticate] },
+    async (req) => {
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: req.user!.uid },
+      })
+      if (!user) {
+        return { success: false, error: 'USER_NOT_FOUND' }
+      }
+      return {
+        success: true,
+        data: {
+          id: user.id,
+          openid: user.openid,
+          role: user.role,
+          name: user.name,
+          avatarUrl: user.avatarUrl,
+        },
+      }
+    },
+  )
+
   fastify.post(
     '/profile/update',
     { preHandler: [fastify.authenticate] },

@@ -36,17 +36,10 @@ Page({
     const openid = cached._openid || cached.openid;
     if (!openid) return;
     try {
-      const res = await request('/api/auth/login', {
-        method: 'POST',
-        skipAuth: true,
-        data: {
-          role: cached.role,
-          name: cached.name,
-          avatarUrl: cached.avatarUrl,
-        },
-      });
-      if (res && res.success && res.data && res.data.user) {
-        const fresh = res.data.user;
+      // 用 JWT 拉当前用户（不再调 /api/auth/login，那个需要 wx.login() 的 code）
+      const res = await request('/api/profile/me', { method: 'GET' });
+      if (res && res.success && res.data) {
+        const fresh = res.data;
         // 同时更新 openid 字段兼容老格式
         fresh._openid = fresh._openid || fresh.openid;
         app.globalData.userInfo = fresh;

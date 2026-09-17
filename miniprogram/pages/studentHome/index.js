@@ -36,17 +36,9 @@ Page({
     const openid = cached._openid || cached.openid;
     if (!openid) return;
     try {
-      const res = await request('/api/auth/login', {
-        method: 'POST',
-        skipAuth: true,
-        data: {
-          role: cached.role,
-          name: cached.name,
-          avatarUrl: cached.avatarUrl,
-        },
-      });
-      if (res && res.success && res.data && res.data.user) {
-        const fresh = res.data.user;
+      const res = await request('/api/profile/me', { method: 'GET' });
+      if (res && res.success && res.data) {
+        const fresh = res.data;
         fresh._openid = fresh._openid || fresh.openid;
         app.globalData.userInfo = fresh;
         wx.setStorageSync('userInfo', fresh);
