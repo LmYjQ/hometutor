@@ -6,12 +6,14 @@
 //   - 「⋯」菜单 → 软删除批次
 //   - legacy 批次不显示删除入口（避免误删旧作业）
 
+const { request } = require('../../utils/request');
+
 Page({
   data: {
     classId: '',
-    classInfo: { name: '', invite_code: '', student_ids: [] },
+    classInfo: { name: '', inviteCode: '', members: [] },
     students: [],
-    batches: [],                      // [{ _id, title, assignments: [...], isLegacy }]
+    batches: [],                      // [{ id, title, assignments: [...] }]
     expandedBatchIdsMap: {},          // { batchId: true } 仅展开的在里面
     showStudents: false,
     showBatchMenu: false,
@@ -33,78 +35,81 @@ Page({
     }
   },
 
-  loadClassDetail() {
+  async loadClassDetail() {
     wx.showLoading({ title: '加载中...' });
 
-    // 1. 班级基本信息
-    wx.cloud.callFunction({
-      name: 'getMyClasses',
-      data: {},
-      success: (res) => {
-        if (res.result.success) {
-          const classInfo = res.result.data.find(c => c._id === this.data.classId);
-          if (classInfo) {
-            this.setData({ classInfo });
-            this.loadStudents(classInfo.student_ids || []);
-          }
+    try {
+      // 1. 班级基本信息（含 members 列表）
+      const clsRes = await request('/api/classes', { method: 'GET' });
+      if (clsRes && clsRes.success && clsRes.data) {
+        const allTeaching = clsRes.data.teaching || [];
+        const classInfo = allTeaching.find(c => c.id === this.data.classId);
+        if (classInfo) {
+          // members[] → students[]（兼容老字段）
+          const members = classInfo.members || [];
+          const students = members.map((m) => ({
+            id: m.student?.id,
+            _openid: m.student?.openid,
+            name: m.student?.name,
+            avatarUrl: m.student?.avatarUrl,
+            joinedAt: m.joinedAt,
+          }));
+          this.setData({
+            classInfo: {
+              ...classInfo,
+              name: classInfo.name,
+              inviteCode: classInfo.inviteCode,
+            },
+            students,
+          });
         }
       }
-    });
+    } catch (e) {
+      console.error('加载班级失败', e);
+    }
 
     // 2. 批次化作业列表
     this.loadAssignmentBatches();
   },
 
-  loadAssignmentBatches() {
-    wx.cloud.callFunction({
-      name: 'getAssignmentSubmissions',
-      data: { classId: this.data.classId },
-      success: (res) => {
-        if (!res.result.success) return;
-        const batches = (res.result.data || []).map(b => ({
-          ...b,
-          // 给每个 assignment 加 statusText 给 UI 用
-          assignments: (b.assignments || []).map(a => ({
-            ...a,
-            statusText: a.status === 'active' ? '进行中' : '已结束'
-          }))
-        }));
+  async loadAssignmentBatches() {
+    try {
+      const res = await request('/api/teacher/assignments', {
+        method: 'GET',
+        data: { classId: this.data.classId },
+      });
+      if (!res || !res.success) return;
+      const batches = (res.data.batches || []).map((b) => ({
+        ...b,
+        // 兼容老字段 _id → id
+        id: b.id || b._id,
+        assignments: (b.assignments || []).map((a) => ({
+          ...a,
+          id: a.id || a._id,
+          statusText: (a.status === 'DELETED' || a.status === 'deleted')
+            ? '已结束'
+            : '进行中',
+        })),
+      }));
 
-        // 默认只展开最新批次（数组已经按 created_at desc 排序）
-        const expandedBatchIdsMap = {};
-        if (batches.length > 0) {
-          expandedBatchIdsMap[batches[0]._id] = true;
-        }
+      // 默认只展开最新批次
+      const expandedBatchIdsMap = {};
+      if (batches.length > 0) {
+        expandedBatchIdsMap[batches[0].id] = true;
+      }
 
-        this.setData({ batches, expandedBatchIdsMap });
-      },
-      fail: (err) => console.error('加载作业列表失败:', err),
-      complete: () => wx.hideLoading()
-    });
-  },
-
-  // 拉所有学生的 name / avatarUrl
-  loadStudents(studentIds) {
-    if (!studentIds.length) {
-      this.setData({ students: [] });
-      return;
+      this.setData({ batches, expandedBatchIdsMap });
+    } catch (err) {
+      console.error('加载作业列表失败:', err);
+    } finally {
+      wx.hideLoading();
     }
-    wx.cloud.callFunction({
-      name: 'getClassStudents',
-      data: { studentIds },
-      success: (res) => {
-        if (res.result.success) {
-          this.setData({ students: res.result.data || [] });
-        }
-      },
-      fail: (err) => console.error('加载学生列表失败:', err)
-    });
   },
 
   copyInviteCode() {
     wx.setClipboardData({
-      data: this.data.classInfo.invite_code,
-      success: () => wx.showToast({ title: '已复制邀请码', icon: 'success' })
+      data: this.data.classInfo.inviteCode,
+      success: () => wx.showToast({ title: '已复制邀请码', icon: 'success' }),
     });
   },
 
@@ -131,11 +136,11 @@ Page({
     this.setData({
       showBatchMenu: true,
       menuBatchId: id,
-      menuBatchTitle: title
+      menuBatchTitle: title,
     });
   },
 
-  onBatchMenuChange(e) {
+  onBatchMenuChange() {
     // action-sheet 自身关闭时触发
     this.setData({ showBatchMenu: false });
   },
@@ -147,8 +152,8 @@ Page({
     this.setData({ showBatchMenu: false });
 
     // 二次确认 modal
-    const batch = this.data.batches.find(b => b._id === id);
-    const count = batch ? batch.assignment_count : 0;
+    const batch = this.data.batches.find(b => b.id === id);
+    const count = batch ? (batch.assignmentCount || batch.assignments?.length || 0) : 0;
     wx.showModal({
       title: '删除作业批次',
       content: `删除「${title}」？\n包含 ${count} 道题\n删除后学生将看不到本批次。\n（如需恢复请联系管理员）`,
@@ -157,44 +162,43 @@ Page({
       cancelText: '取消',
       success: (res) => {
         if (res.confirm) this.doDeleteBatch(id);
-      }
+      },
     });
   },
 
-  doDeleteBatch(batchId) {
+  async doDeleteBatch(batchId) {
     wx.showLoading({ title: '删除中...', mask: true });
-    wx.cloud.callFunction({
-      name: 'deleteAssignmentBatch',
-      data: { batchId },
-      success: (res) => {
-        wx.hideLoading();
-        if (res.result.success) {
-          wx.showToast({ title: '已删除', icon: 'success' });
-          // 从本地列表中移除该批次（不再触发网络请求）
-          const newBatches = this.data.batches.filter(b => b._id !== batchId);
-          this.setData({ batches: newBatches });
-        } else {
-          wx.showToast({ title: res.result.error || '删除失败', icon: 'none' });
-        }
-      },
-      fail: (err) => {
-        wx.hideLoading();
-        console.error('删除批次失败:', err);
-        wx.showToast({ title: '网络错误', icon: 'none' });
+    try {
+      const res = await request('/api/batches/delete', {
+        method: 'POST',
+        data: { batchId },
+      });
+      wx.hideLoading();
+      if (res && res.success) {
+        wx.showToast({ title: '已删除', icon: 'success' });
+        // 从本地列表中移除该批次（不再触发网络请求）
+        const newBatches = this.data.batches.filter(b => b.id !== batchId);
+        this.setData({ batches: newBatches });
+      } else {
+        wx.showToast({ title: (res && res.error) || '删除失败', icon: 'none' });
       }
-    });
+    } catch (err) {
+      wx.hideLoading();
+      console.error('删除批次失败:', err);
+      wx.showToast({ title: '网络错误', icon: 'none' });
+    }
   },
 
   goToAssignmentDetail(e) {
     const assignmentId = e.currentTarget.dataset.id;
     wx.navigateTo({
-      url: `/pages/assignmentDetail/index?assignmentId=${assignmentId}&className=${this.data.classInfo.name}`
+      url: `/pages/assignmentDetail/index?assignmentId=${assignmentId}&className=${this.data.classInfo.name}`,
     });
   },
 
   publishAssignment() {
     wx.navigateTo({
-      url: `/pages/publishAssignmentChat/index?classId=${this.data.classId}&className=${this.data.classInfo.name}`
+      url: `/pages/publishAssignmentChat/index?classId=${this.data.classId}&className=${this.data.classInfo.name}`,
     });
-  }
+  },
 });

@@ -1,5 +1,6 @@
 // pages/publishAssignmentChat/index.js
 const fs = wx.getFileSystemManager();
+const { request } = require('../../utils/request');
 
 Page({
   data: {
@@ -252,101 +253,95 @@ Page({
     });
   },
 
-  publishAssignments(csvContent) {
+  async publishAssignments(csvContent) {
     this.setData({ uploading: true });
-
     wx.showLoading({ title: '发布中...' });
 
-    wx.cloud.callFunction({
-      name: 'publishAssignment',
-      data: {
-        classId: this.data.classId,
-        className: this.data.className,
-        fileContent: csvContent,
-        fileType: 'csv',
-        batchTitle: this.data.batchTitle
-      },
-      success: (res) => {
-        if (res.result.success) {
-          const { count } = res.result.data;
-          this.addMessage({
-            type: 'assistant',
-            content: `✅ 成功发布「${this.data.batchTitle}」批次，含 ${count} 个作业！\n\n作业已添加到班级中，学生可以看到并提交背诵视频。`
-          });
-          this.setData({ batchTitle: '' });
-        } else {
-          this.addMessage({
-            type: 'assistant',
-            content: `❌ 发布失败：${res.result.error}`
-          });
-        }
-      },
-      fail: (err) => {
-        console.error('发布作业失败:', err);
+    try {
+      const res = await request('/api/assignments/publish', {
+        method: 'POST',
+        data: {
+          classId: this.data.classId,
+          className: this.data.className,
+          fileContent: csvContent,
+          fileType: 'csv',
+          batchTitle: this.data.batchTitle,
+        },
+      });
+      if (res && res.success) {
+        const { count } = res.data;
         this.addMessage({
           type: 'assistant',
-          content: '❌ 网络错误，请重试'
+          content: `✅ 成功发布「${this.data.batchTitle}」批次，含 ${count} 个作业！\n\n作业已添加到班级中，学生可以看到并提交背诵视频。`,
         });
-      },
-      complete: () => {
-        this.setData({ uploading: false });
-        wx.hideLoading();
+        this.setData({ batchTitle: '' });
+      } else {
+        this.addMessage({
+          type: 'assistant',
+          content: `❌ 发布失败：${(res && res.error) || '未知错误'}`,
+        });
       }
-    });
+    } catch (err) {
+      console.error('发布作业失败:', err);
+      this.addMessage({
+        type: 'assistant',
+        content: '❌ 网络错误，请重试',
+      });
+    } finally {
+      this.setData({ uploading: false });
+      wx.hideLoading();
+    }
   },
 
   // 发布Excel文件中的作业
-  publishExcelAssignments() {
+  async publishExcelAssignments() {
     if (!this.tempExcelBase64) {
       wx.showToast({
         title: '请重新上传文件',
-        icon: 'none'
+        icon: 'none',
       });
       return;
     }
 
     this.setData({ uploading: true });
-
     wx.showLoading({ title: '发布中...' });
 
-    wx.cloud.callFunction({
-      name: 'publishAssignment',
-      data: {
-        classId: this.data.classId,
-        className: this.data.className,
-        fileContent: this.tempExcelBase64,
-        fileType: 'excel',
-        batchTitle: this.data.batchTitle
-      },
-      success: (res) => {
-        if (res.result.success) {
-          const { count } = res.result.data;
-          this.addMessage({
-            type: 'assistant',
-            content: `✅ 成功发布「${this.data.batchTitle}」批次，含 ${count} 个作业！\n\n作业已添加到班级中，学生可以看到并提交背诵视频。`
-          });
-          this.setData({ batchTitle: '' });
-        } else {
-          this.addMessage({
-            type: 'assistant',
-            content: `❌ 发布失败：${res.result.error}`
-          });
-        }
-      },
-      fail: (err) => {
-        console.error('发布作业失败:', err);
+    try {
+      const res = await request('/api/assignments/publish', {
+        method: 'POST',
+        data: {
+          classId: this.data.classId,
+          className: this.data.className,
+          fileContent: this.tempExcelBase64,
+          fileType: 'excel',
+          batchTitle: this.data.batchTitle,
+        },
+      });
+      if (res && res.success) {
+        const { count } = res.data;
         this.addMessage({
           type: 'assistant',
-          content: '❌ 网络错误，请重试'
+          content: `✅ 成功发布「${this.data.batchTitle}」批次，含 ${count} 个作业！\n\n作业已添加到班级中，学生可以看到并提交背诵视频。`,
         });
-      },
-      complete: () => {
-        this.setData({ uploading: false });
-        wx.hideLoading();
-        // 清空临时数据
-        this.tempExcelBase64 = null;
+        this.setData({ batchTitle: '' });
+      } else {
+        this.addMessage({
+          type: 'assistant',
+          content: `❌ 发布失败：${(res && res.error) || '未知错误'}`,
+        });
       }
-    });
+    } catch (err) {
+      console.error('发布作业失败:', err);
+      this.addMessage({
+        type: 'assistant',
+        content: '❌ 网络错误，请重试',
+      });
+    } finally {
+      this.setData({ uploading: false });
+      wx.hideLoading();
+      // 清空临时数据
+      this.tempExcelBase64 = null;
+    }
   },
 
   addMessage(msg) {

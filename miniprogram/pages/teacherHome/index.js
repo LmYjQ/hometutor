@@ -1,5 +1,6 @@
 // pages/teacherHome/index.js
 const app = getApp();
+const { request } = require('../../utils/request');
 
 Page({
   data: {
@@ -25,61 +26,70 @@ Page({
       wx.redirectTo({ url: '/pages/login/index' });
       return;
     }
-    // 后台静默刷新：从云函数拉一次最新 userInfo（覆盖掉本地可能 stale 的 role / name / avatarUrl）
-    this.refreshUserInfoFromCloud();
+    // 后台静默刷新：从后端拉一次最新 userInfo
+    this.refreshUserInfoFromBackend();
   },
 
-  async refreshUserInfoFromCloud() {
+  async refreshUserInfoFromBackend() {
     const cached = this.data.userInfo;
-    if (!cached || !cached._openid) return;
+    if (!cached) return;
+    const openid = cached._openid || cached.openid;
+    if (!openid) return;
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'login',
+      const res = await request('/api/auth/login', {
+        method: 'POST',
+        skipAuth: true,
         data: {
           role: cached.role,
           name: cached.name,
-          avatarUrl: cached.avatarUrl
-        }
+          avatarUrl: cached.avatarUrl,
+        },
       });
-      if (res.result.success) {
-        const fresh = res.result.data;
+      if (res && res.success && res.data && res.data.user) {
+        const fresh = res.data.user;
+        // 同时更新 openid 字段兼容老格式
+        fresh._openid = fresh._openid || fresh.openid;
         app.globalData.userInfo = fresh;
         wx.setStorageSync('userInfo', fresh);
         this.setData({ userInfo: fresh });
-        // 如果 role 不一致（比如被另一个端切换过），跳到对应首页
+        // role 不一致则跳到对应首页
         if (fresh.role !== cached.role) {
           wx.redirectTo({
             url: fresh.role === 'teacher'
               ? '/pages/teacherHome/index'
-              : '/pages/studentHome/index'
+              : '/pages/studentHome/index',
           });
         }
       }
     } catch (e) {
-      // 静默失败：本地缓存能用就行
       console.log('[refreshUserInfo] 静默失败', e);
     }
   },
 
-  loadClasses() {
-    wx.cloud.callFunction({
-      name: 'getMyClasses',
-      data: {},
-      success: (res) => {
-        if (res.result.success) {
-          const classes = res.result.data;
-          const studentCount = classes.reduce((sum, cls) => sum + (cls.student_ids?.length || 0), 0);
-          this.setData({
-            classes,
-            classCount: classes.length,
-            studentCount
-          });
-        }
-      },
-      fail: (err) => {
-        console.error('加载班级失败:', err);
+  async loadClasses() {
+    try {
+      const res = await request('/api/classes', { method: 'GET' });
+      if (res && res.success && res.data) {
+        const classes = res.data.teaching || [];
+        // 兼容老格式：student_ids[] 与新格式：_count.members
+        const studentCount = classes.reduce((sum, cls) => {
+          if (cls._count && typeof cls._count.members === 'number') {
+            return sum + cls._count.members;
+          }
+          if (Array.isArray(cls.student_ids)) {
+            return sum + cls.student_ids.length;
+          }
+          return sum;
+        }, 0);
+        this.setData({
+          classes,
+          classCount: classes.length,
+          studentCount,
+        });
       }
-    });
+    } catch (err) {
+      console.error('加载班级失败:', err);
+    }
   },
 
   showCreateClassModal() {
@@ -94,7 +104,7 @@ Page({
     this.setData({ newClassName: e.detail.value });
   },
 
-  createClass() {
+  async createClass() {
     const name = this.data.newClassName.trim();
     if (!name) {
       wx.showToast({ title: '请输入班级名称', icon: 'none' });
@@ -102,46 +112,43 @@ Page({
     }
 
     this.setData({ creating: true });
-
-    wx.cloud.callFunction({
-      name: 'createClass',
-      data: { name },
-      success: (res) => {
-        if (res.result.success) {
-          wx.showToast({ title: '创建成功', icon: 'success' });
-          this.hideModal();
-          this.loadClasses();
-        } else {
-          wx.showToast({ title: res.result.error || '创建失败', icon: 'none' });
-        }
-      },
-      fail: (err) => {
-        console.error('创建班级失败:', err);
-        wx.showToast({ title: '创建失败', icon: 'none' });
-      },
-      complete: () => {
-        this.setData({ creating: false });
+    try {
+      const res = await request('/api/classes', {
+        method: 'POST',
+        data: { name },
+      });
+      if (res && res.success) {
+        wx.showToast({ title: '创建成功', icon: 'success' });
+        this.hideModal();
+        this.loadClasses();
+      } else {
+        wx.showToast({ title: (res && res.error) || '创建失败', icon: 'none' });
       }
-    });
+    } catch (err) {
+      console.error('创建班级失败:', err);
+      wx.showToast({ title: '创建失败', icon: 'none' });
+    } finally {
+      this.setData({ creating: false });
+    }
   },
 
   goToClassDetail(e) {
     const classId = e.currentTarget.dataset.id;
     wx.navigateTo({
-      url: `/pages/classDetail/index?classId=${classId}`
+      url: `/pages/classDetail/index?classId=${classId}`,
     });
   },
 
   goToProfile() {
     wx.navigateTo({
-      url: '/pages/myProfile/index'
+      url: '/pages/myProfile/index',
     });
   },
 
   onShareAppMessage() {
     return {
       title: '智能背诵助手 - 快速创建班级',
-      path: '/pages/login/index'
+      path: '/pages/login/index',
     };
-  }
+  },
 });

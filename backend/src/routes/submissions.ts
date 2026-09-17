@@ -129,4 +129,36 @@ export default async function (fastify: FastifyInstance) {
       }
     },
   )
+
+  // ============== 单个提交详情（按 id）==============
+  fastify.get(
+    '/submissions/:id',
+    { preHandler: [fastify.authenticate] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string }
+      const submission = await fastify.prisma.submission.findUnique({
+        where: { id },
+      })
+      if (!submission) {
+        reply.code(404)
+        return { success: false, error: 'SUBMISSION_NOT_FOUND' }
+      }
+      // 权限：老师可看自己班级的，学生只能看自己的
+      const { uid, role } = req.user!
+      if (role === 'student' && submission.studentId !== uid) {
+        reply.code(403)
+        return { success: false, error: 'FORBIDDEN' }
+      }
+      if (role === 'teacher') {
+        const assignment = await fastify.prisma.assignment.findUnique({
+          where: { id: submission.assignmentId },
+        })
+        if (!assignment || assignment.teacherId !== uid) {
+          reply.code(403)
+          return { success: false, error: 'FORBIDDEN' }
+        }
+      }
+      return { success: true, data: submission }
+    },
+  )
 }

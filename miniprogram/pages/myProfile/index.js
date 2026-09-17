@@ -1,5 +1,6 @@
 // pages/myProfile/index.js
 const app = getApp();
+const { request, uploadToCloud } = require('../../utils/request');
 
 // 开发者专属的 openid：只有这个微信号能看到「切换身份」入口（用于开发测试）
 // ⚠️ 这是硬编码字符串，不是密钥，公开了不影响安全（云函数端还会再校验一次）
@@ -118,7 +119,7 @@ Page({
     const openid = wx.getStorageSync('openid') || 'anon';
     const ext = (tempPath.match(/\.(\w{2,5})$/) || ['', 'jpg'])[1];
     const cloudPath = `avatar/${openid}_${Date.now()}.${ext}`;
-    const res = await wx.cloud.uploadFile({ cloudPath, filePath: tempPath });
+    const res = await uploadToCloud({ cloudPath, filePath: tempPath });
     if (!res.fileID) throw new Error('uploadFile 返回空 fileID');
     return res.fileID;
   },
@@ -129,20 +130,21 @@ Page({
   async callUpdateProfile(payload) {
     wx.showLoading({ title: '保存中...', mask: true });
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'updateProfile',
-        data: payload
+      const res = await request('/api/profile/update', {
+        method: 'POST',
+        data: payload,
       });
       wx.hideLoading();
 
-      if (res.result.success) {
-        const newUser = res.result.data;
+      if (res && res.success && res.data) {
+        const newUser = res.data;
+        newUser._openid = newUser._openid || newUser.openid;
         app.globalData.userInfo = { ...this.data.userInfo, ...newUser };
         wx.setStorageSync('userInfo', app.globalData.userInfo);
         this.setData({ userInfo: app.globalData.userInfo });
         wx.showToast({ title: '已更新', icon: 'success' });
       } else {
-        wx.showToast({ title: res.result.error || '更新失败', icon: 'none' });
+        wx.showToast({ title: (res && res.error) || '更新失败', icon: 'none' });
       }
     } catch (err) {
       wx.hideLoading();
@@ -193,15 +195,16 @@ Page({
     this.setData({ switching: true });
     wx.showLoading({ title: '切换中...', mask: true });
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'updateProfile',
-        data: { role: targetRole, inviteCode }
+      const res = await request('/api/profile/update', {
+        method: 'POST',
+        data: { role: targetRole, inviteCode },
       });
       wx.hideLoading();
       this.setData({ switching: false });
 
-      if (res.result.success) {
-        const newUser = res.result.data;
+      if (res && res.success && res.data) {
+        const newUser = res.data;
+        newUser._openid = newUser._openid || newUser.openid;
         app.globalData.userInfo = { ...this.data.userInfo, ...newUser };
         wx.setStorageSync('userInfo', app.globalData.userInfo);
         this.setData({ userInfo: app.globalData.userInfo });
@@ -216,7 +219,7 @@ Page({
           }
         }, 800);
       } else {
-        wx.showToast({ title: res.result.error || '切换失败', icon: 'none' });
+        wx.showToast({ title: (res && res.error) || '切换失败', icon: 'none' });
       }
     } catch (err) {
       wx.hideLoading();

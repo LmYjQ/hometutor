@@ -1,5 +1,6 @@
 // pages/assignmentDetail/index.js
 const app = getApp();
+const { request } = require('../../utils/request');
 
 Page({
   data: {
@@ -25,49 +26,75 @@ Page({
     }
   },
 
-  loadData() {
+  async loadData() {
     this.setData({ loading: true });
+    try {
+      const res = await request(`/api/assignments/${this.data.assignmentId}/stats`, {
+        method: 'GET',
+      });
+      if (res && res.success && res.data) {
+        const {
+          assignment,
+          submissions = [],
+          notSubmittedStudents = [],
+          submissionCount,
+          studentCount,
+        } = res.data;
 
-    wx.cloud.callFunction({
-      name: 'getAssignmentStudentStats',
-      data: { assignmentId: this.data.assignmentId },
-      success: (res) => {
-        if (res.result.success) {
-          const {
-            assignment,
-            studentStats,
-            notSubmittedStudents,
-            submittedCount,
-            notSubmittedCount,
-            totalStudentCount
-          } = res.result.data;
+        const submittedCount = submissionCount != null
+          ? submissionCount
+          : submissions.length;
+        const totalStudentCount = studentCount != null
+          ? studentCount
+          : (submittedCount + (notSubmittedStudents.length || 0));
+        const notSubmittedCount = Math.max(0, totalStudentCount - submittedCount);
 
-          const deadline = new Date(assignment.deadline);
-          const deadlineText = this.formatDate(deadline);
-
-          this.setData({
-            assignment: {
-              ...assignment,
-              deadlineText,
-              statusText: assignment.status === 'active' ? '进行中' : '已结束'
-            },
-            studentStats,
-            notSubmittedStudents,
-            submittedCount,
-            notSubmittedCount,
-            totalStudentCount,
-            loading: false
-          });
-        } else {
-          console.error(res.result.error);
-          this.setData({ loading: false });
+        // 构造简化版 studentStats（按 studentId 聚合最新一条）
+        const byStudent = new Map();
+        for (const s of submissions) {
+          if (!byStudent.has(s.studentId)) byStudent.set(s.studentId, s);
         }
-      },
-      fail: (err) => {
-        console.error('加载失败:', err);
+        const studentStats = Array.from(byStudent.values()).map((s) => ({
+          student: {
+            id: s.studentId,
+            name: s.studentName,
+            avatarUrl: s.avatarUrl,
+          },
+          latestSubmission: s,
+          submissionCount: submissions.filter((x) => x.studentId === s.studentId).length,
+        }));
+
+        const deadlineText = assignment && assignment.deadline
+          ? this.formatDate(new Date(assignment.deadline))
+          : '';
+        const statusText = (assignment && (assignment.status === 'DELETED' || assignment.status === 'deleted'))
+          ? '已结束'
+          : '进行中';
+
+        this.setData({
+          assignment: {
+            id: assignment?.id,
+            question_title: assignment?.questionTitle,
+            reference_text: assignment?.referenceText,
+            deadline: assignment?.deadline,
+            deadlineText,
+            statusText,
+          },
+          studentStats,
+          notSubmittedStudents,
+          submittedCount,
+          notSubmittedCount,
+          totalStudentCount,
+          loading: false,
+        });
+      } else {
+        console.error((res && res.error) || '加载失败');
         this.setData({ loading: false });
       }
-    });
+    } catch (err) {
+      console.error('加载失败:', err);
+      this.setData({ loading: false });
+    }
   },
 
   formatDate(date) {

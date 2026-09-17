@@ -98,7 +98,14 @@ export default async function (fastify: FastifyInstance) {
         const teaching = await fastify.prisma.class.findMany({
           where: { teacherId: uid },
           orderBy: { createdAt: 'desc' },
-          include: { _count: { select: { members: { where: { status: 'ACTIVE' } } } } },
+          include: {
+            members: {
+              where: { status: 'ACTIVE' },
+              include: { student: { select: { id: true, name: true, avatarUrl: true, openid: true } } },
+              orderBy: { joinedAt: 'asc' },
+            },
+            _count: { select: { members: { where: { status: 'ACTIVE' } } } },
+          },
         })
         return { success: true, data: { teaching, studying: [] } }
       }

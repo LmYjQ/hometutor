@@ -1,5 +1,6 @@
 // pages/submissionResult/index.js
 const app = getApp();
+const { request } = require('../../utils/request');
 
 Page({
   data: {
@@ -16,62 +17,47 @@ Page({
     }
   },
 
-  loadResult() {
+  async loadResult() {
     this.setData({ loading: true, error: '' });
+    try {
+      const res = await request(`/api/submissions/${this.data.submissionId}`, {
+        method: 'GET',
+      });
+      if (res && res.success && res.data) {
+        const submission = res.data;
+        // 兼容老字段
+        submission._id = submission.id || submission._id;
+        submission.audio_text = submission.audioText || submission.audio_text;
 
-    wx.cloud.callFunction({
-      name: 'getStudentSubmissions',
-      data: { submissionId: this.data.submissionId },
-      success: (res) => {
-        if (res.result.success) {
-          const submission = res.result.data[0];
-          if (submission) {
-            // 检查是否为失败状态
-            if (submission.status === 'failed') {
-              this.setData({
-                submission,
-                error: submission.error || '评分失败，请重新提交',
-                loading: false
-              });
-            } else if (submission.status === 'pending') {
-              // 待评分状态，显示提示
-              this.setData({
-                submission,
-                loading: false
-              });
-              wx.showToast({
-                title: '评分中，请稍候...',
-                icon: 'none',
-                duration: 3000
-              });
-            } else {
-              // 评分完成
-              this.setData({
-                submission,
-                loading: false
-              });
-            }
-          } else {
-            this.setData({
-              error: '未找到提交记录',
-              loading: false
-            });
-          }
-        } else {
+        if (submission.status === 'FAILED') {
           this.setData({
-            error: res.result.error || '获取结果失败',
-            loading: false
+            submission,
+            error: submission.error || '评分失败，请重新提交',
+            loading: false,
           });
+        } else if (submission.status === 'PENDING') {
+          this.setData({ submission, loading: false });
+          wx.showToast({
+            title: '评分中，请稍候...',
+            icon: 'none',
+            duration: 3000,
+          });
+        } else {
+          this.setData({ submission, loading: false });
         }
-      },
-      fail: (err) => {
-        console.error('获取结果失败:', err);
+      } else {
         this.setData({
-          error: '网络错误，请重试',
-          loading: false
+          error: (res && res.error) || '获取结果失败',
+          loading: false,
         });
       }
-    });
+    } catch (err) {
+      console.error('获取结果失败:', err);
+      this.setData({
+        error: '网络错误，请重试',
+        loading: false,
+      });
+    }
   },
 
   get scoreColor() {
@@ -82,17 +68,20 @@ Page({
   },
 
   get isFailed() {
-    return this.data.submission?.status === 'failed';
+    return this.data.submission?.status === 'FAILED'
+      || this.data.submission?.status === 'failed';
   },
 
   get isPending() {
-    return this.data.submission?.status === 'pending';
+    return this.data.submission?.status === 'PENDING'
+      || this.data.submission?.status === 'pending';
   },
 
   goToRecitation() {
-    const assignmentId = this.data.submission?.assignment_id;
+    const assignmentId = this.data.submission?.assignmentId
+      || this.data.submission?.assignment_id;
     wx.redirectTo({
-      url: `/pages/recitation/index?assignmentId=${assignmentId}`
+      url: `/pages/recitation/index?assignmentId=${assignmentId}`,
     });
   },
 

@@ -1,5 +1,6 @@
 // pages/recitation/index.js
 const app = getApp();
+const { request, uploadToCloud } = require('../../utils/request');
 
 Page({
   data: {
@@ -69,42 +70,55 @@ Page({
   },
 
   // 加载作业详情
-  loadAssignment() {
-    wx.cloud.callFunction({
-      name: 'getStudentTodoList',
-      data: {},
-      success: (res) => {
-        if (res.result.success) {
-          const assignment = res.result.data.assignments.find(a => a._id === this.data.assignmentId);
-          if (assignment) {
-            this.setData({
-              assignment: {
-                class_name: assignment.class_name,
-                question_title: assignment.question_title,
-                reference_text: assignment.reference_text,
-                deadline: assignment.deadline,
-                deadlineText: assignment.deadlineText
-              }
-            });
-          }
+  async loadAssignment() {
+    try {
+      const res = await request('/api/student/todo-list', { method: 'GET' });
+      if (res && res.success && res.data) {
+        const all = (res.data.assignments || []);
+        const found = all.find((a) => (a.id || a._id) === this.data.assignmentId);
+        if (found) {
+          this.setData({
+            assignment: {
+              class_name: found.className || found.class_name,
+              question_title: found.questionTitle || found.question_title,
+              reference_text: found.referenceText || found.reference_text,
+              deadline: found.deadline,
+              deadlineText: found.deadlineText,
+            },
+          });
         }
       }
-    });
+    } catch (e) {
+      console.error('[loadAssignment] 失败:', e);
+    }
   },
 
   // 加载历史提交记录
-  loadHistory() {
-    wx.cloud.callFunction({
-      name: 'getStudentSubmissions',
-      data: { assignmentId: this.data.assignmentId },
-      success: (res) => {
-        if (res.result.success) {
-          this.setData({ historySubmissions: res.result.data });
-          // 计算剩余提交次数
-          this.updateRemainingSubmissions();
+  async loadHistory() {
+    try {
+      const res = await request('/api/student/submissions', {
+        method: 'GET',
+        data: { assignmentId: this.data.assignmentId },
+      });
+      if (res && res.success && res.data) {
+        // 老格式 data[] / 新格式 data.submissions[]
+        const subs = Array.isArray(res.data) ? res.data : (res.data.submissions || []);
+        // 兼容老字段
+        const normalized = subs.map((s) => ({
+          ...s,
+          _id: s._id || s.id,
+          audio_text: s.audio_text || s.audioText,
+          created_at: s.created_at || s.createdAt,
+        }));
+        this.setData({ historySubmissions: normalized });
+        if (typeof res.data.remainingAttempts === 'number') {
+          this.setData({ remainingSubmissions: res.data.remainingAttempts });
         }
+        this.updateRemainingSubmissions();
       }
-    });
+    } catch (e) {
+      console.error('[loadHistory] 失败:', e);
+    }
   },
 
   // 更新剩余提交次数
@@ -380,32 +394,29 @@ Page({
       // 2. 上传到云存储
       this.setStep('upload', 'active');
       this.setData({ progress: 20, progressText: '上传文件中...' });
-      const uploadRes = await wx.cloud.uploadFile({
+      const uploadRes = await uploadToCloud({
         cloudPath: `recitations/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${uploadExt}`,
         filePath: uploadFilePath,
-        env: app.globalData.env
       });
       console.log('文件上传成功:', uploadRes.fileID, 'type:', uploadContentType);
       this.setStep('upload', 'done');
 
-      // 3. 调云函数（云函数内部按顺序走 ASR → LLM）
-      //    前端不知道云函数内部分阶段细节，所以把 ASR/LLM 都标 active，
-      //    等拿到结果再统一标记 done
+      // 3. 调后端（内部按顺序走 ASR → LLM）
       this.setStep('asr', 'active');
       this.setStep('llm', 'active');
       this.setData({ progress: 50, progressText: 'AI 评分中...' });
       this.setData({ uploading: false, analyzing: true });
 
-      let res;
+      let result;
       try {
-        res = await wx.cloud.callFunction({
-          name: 'submitRecitation',
+        result = await request('/api/submit-recitation', {
+          method: 'POST',
           data: {
             assignmentId: this.data.assignmentId,
             fileID: uploadRes.fileID,
-            contentType: uploadContentType
+            contentType: uploadContentType,
           },
-          config: { timeout: 185000 }  // 185 秒，比云函数超时(180s)留 5s 缓冲，避免两端同时到时
+          timeout: 95000,  // 95 秒，比云函数超时(90s)留 5s 缓冲，避免两端同时到时
         });
       } catch (err) {
         console.error('AI评分失败:', err);
@@ -416,16 +427,9 @@ Page({
         return;
       }
 
-      const result = res.result;
-      if (result.success) {
+      if (result && result.success) {
         this.setStep('asr', 'done');
         this.setStep('llm', 'done');
-
-        // 更新最大提交次数配置
-        if (result.data.maxSubmissions) {
-          this.setData({ maxSubmissions: result.data.maxSubmissions });
-          this.updateRemainingSubmissions();
-        }
 
         this.setData({
           analyzing: false,
@@ -436,27 +440,28 @@ Page({
           lastSubmittedAt: Date.now(),
           videoPath: '',
           videoSize: 0,
-          fileSizeText: ''
+          fileSizeText: '',
         });
         wx.showToast({ title: '提交成功', icon: 'success' });
 
         setTimeout(() => {
           wx.navigateTo({
-            url: `/pages/submissionResult/index?submissionId=${result.data.submissionId}`
+            url: `/pages/submissionResult/index?submissionId=${result.data.submissionId}`,
           });
         }, 1500);
       } else {
-        if (result.code === 'SUBMISSION_LIMIT_EXCEEDED') {
+        const errCode = (result && result.error) || '';
+        if (errCode === 'MAX_SUBMISSIONS_EXCEEDED') {
           wx.showModal({
             title: '无法提交',
-            content: result.error,
-            showCancel: false
+            content: errCode,
+            showCancel: false,
           });
           this.setData({ analyzing: false, remainingSubmissions: 0 });
           this.resetSteps();
           return;
         }
-        wx.showToast({ title: result.error || '评分失败', icon: 'none' });
+        wx.showToast({ title: errCode || '评分失败', icon: 'none' });
         this.setData({ analyzing: false });
         this.resetSteps();
       }

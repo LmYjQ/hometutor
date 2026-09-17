@@ -1,5 +1,6 @@
 // pages/studentHome/index.js
 const app = getApp();
+const { request } = require('../../utils/request');
 
 Page({
   data: {
@@ -26,23 +27,27 @@ Page({
       wx.redirectTo({ url: '/pages/login/index' });
       return;
     }
-    this.refreshUserInfoFromCloud();
+    this.refreshUserInfoFromBackend();
   },
 
-  async refreshUserInfoFromCloud() {
+  async refreshUserInfoFromBackend() {
     const cached = this.data.userInfo;
-    if (!cached || !cached._openid) return;
+    if (!cached) return;
+    const openid = cached._openid || cached.openid;
+    if (!openid) return;
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'login',
+      const res = await request('/api/auth/login', {
+        method: 'POST',
+        skipAuth: true,
         data: {
           role: cached.role,
           name: cached.name,
-          avatarUrl: cached.avatarUrl
-        }
+          avatarUrl: cached.avatarUrl,
+        },
       });
-      if (res.result.success) {
-        const fresh = res.result.data;
+      if (res && res.success && res.data && res.data.user) {
+        const fresh = res.data.user;
+        fresh._openid = fresh._openid || fresh.openid;
         app.globalData.userInfo = fresh;
         wx.setStorageSync('userInfo', fresh);
         this.setData({ userInfo: fresh });
@@ -50,7 +55,7 @@ Page({
           wx.redirectTo({
             url: fresh.role === 'teacher'
               ? '/pages/teacherHome/index'
-              : '/pages/studentHome/index'
+              : '/pages/studentHome/index',
           });
         }
       }
@@ -59,54 +64,54 @@ Page({
     }
   },
 
-  loadData() {
+  async loadData() {
     wx.showLoading({ title: '加载中...' });
-    wx.cloud.callFunction({
-      name: 'getStudentTodoList',
-      data: {},
-      success: (res) => {
-        wx.hideLoading();
-        if (res.result.success) {
-          const { assignments, batches, classes } = res.result.data;
-          const debug = res.result.debug || {};
-
-          // 第一次进入时，只展开最新批次
-          const expandedBatchIdsMap = {};
-          if (batches && batches.length > 0) {
-            expandedBatchIdsMap[batches[0]._id] = true;
+    try {
+      const res = await request('/api/student/todo-list', { method: 'GET' });
+      wx.hideLoading();
+      if (res && res.success && res.data) {
+        const { assignments, batches } = res.data;
+        // classes 不在 todo-list 里，从 getMyClasses 单独拉一次（合并到 loadClasses 也可以）
+        let classes = this.data.classes;
+        if (!classes || classes.length === 0) {
+          try {
+            const clsRes = await request('/api/classes', { method: 'GET' });
+            if (clsRes && clsRes.success && clsRes.data) {
+              classes = clsRes.data.studying || [];
+            }
+          } catch (e) {
+            console.warn('拉班级失败', e);
           }
-
-          const pendingCount = (assignments || []).filter(a => !a.submitted).length;
-
-          let debugInfo = '';
-          if (!assignments || assignments.length === 0) {
-            if (debug.message) debugInfo = debug.message;
-            if (debug.classIds) debugInfo += `\n查询的班级ID: ${debug.classIds.join(', ')}`;
-          }
-
-          this.setData({
-            assignments: assignments || [],
-            batches: batches || [],
-            expandedBatchIdsMap,
-            classes,
-            classCount: classes.length,
-            pendingCount,
-            debugInfo
-          });
-        } else {
-          const debug = res.result.debug || {};
-          let errorMsg = res.result.error || '获取失败';
-          if (debug.openid) errorMsg += `\nopenid: ${debug.openid}`;
-          if (debug.step) errorMsg += `\n失败步骤: ${debug.step}`;
-          this.setData({ debugInfo: errorMsg });
         }
-      },
-      fail: (err) => {
-        wx.hideLoading();
-        console.error('加载数据失败:', err);
-        this.setData({ debugInfo: '云函数调用失败: ' + JSON.stringify(err) });
+
+        // 第一次进入时，只展开最新批次（兼容老字段 _id 和新字段 id）
+        const expandedBatchIdsMap = {};
+        if (batches && batches.length > 0) {
+          const firstId = batches[0].id || batches[0]._id;
+          if (firstId) expandedBatchIdsMap[firstId] = true;
+        }
+
+        const pendingCount = (assignments || []).filter((a) => !a.submitted).length;
+
+        this.setData({
+          assignments: assignments || [],
+          batches: batches || [],
+          expandedBatchIdsMap,
+          classes,
+          classCount: classes.length,
+          pendingCount,
+          debugInfo: '',
+        });
+      } else {
+        this.setData({
+          debugInfo: (res && res.error) || '获取失败',
+        });
       }
-    });
+    } catch (err) {
+      wx.hideLoading();
+      console.error('加载数据失败:', err);
+      this.setData({ debugInfo: '后端调用失败: ' + JSON.stringify(err) });
+    }
   },
 
   refreshAssignments() {
@@ -133,20 +138,20 @@ Page({
   goToRecitation(e) {
     const assignmentId = e.currentTarget.dataset.id;
     wx.navigateTo({
-      url: `/pages/recitation/index?assignmentId=${assignmentId}`
+      url: `/pages/recitation/index?assignmentId=${assignmentId}`,
     });
   },
 
   goToProfile() {
     wx.navigateTo({
-      url: '/pages/myProfile/index'
+      url: '/pages/myProfile/index',
     });
   },
 
   onShareAppMessage() {
     return {
       title: '智能背诵助手 - 加入班级一起学习',
-      path: '/pages/login/index'
+      path: '/pages/login/index',
     };
-  }
+  },
 });

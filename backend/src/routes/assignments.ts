@@ -167,7 +167,9 @@ export default async function (fastify: FastifyInstance) {
             where: { batchId: batch.id, status: 'ACTIVE' },
             orderBy: { createdAt: 'asc' },
           })
-          return { ...batch, assignments }
+          // 给每个 assignment 标 submitted（该学生是否已提交）
+          const withSubmitted = await markSubmitted(assignments, studentId, fastify.prisma)
+          return { ...batch, assignments: withSubmitted }
         }),
       )
 
@@ -180,15 +182,16 @@ export default async function (fastify: FastifyInstance) {
         },
         orderBy: { createdAt: 'desc' },
       })
+      const legacyWithSubmitted = await markSubmitted(legacy, studentId, fastify.prisma)
 
       return {
         success: true,
         data: {
           batches: batchesWithAssignments,
-          legacy,
+          legacy: legacyWithSubmitted,
           assignments: [
             ...batchesWithAssignments.flatMap((b) => b.assignments),
-            ...legacy,
+            ...legacyWithSubmitted,
           ],
         },
       }
@@ -345,4 +348,22 @@ export default async function (fastify: FastifyInstance) {
 // 辅助：classId 类型守卫（用 Prisma 生成的类型更稳，这里简化）
 function classId(m: { classId: string }) {
   return m.classId
+}
+
+/**
+ * 给一组 assignment 标记每个学生是否已提交
+ */
+async function markSubmitted(
+  assignments: Array<{ id: string }>,
+  studentId: string,
+  prisma: any,
+) {
+  if (assignments.length === 0) return []
+  const ids = assignments.map((a) => a.id)
+  const subs = await prisma.submission.findMany({
+    where: { assignmentId: { in: ids }, studentId },
+    select: { assignmentId: true },
+  })
+  const submittedSet = new Set(subs.map((s: { assignmentId: string }) => s.assignmentId))
+  return assignments.map((a) => ({ ...a, submitted: submittedSet.has(a.id) }))
 }
