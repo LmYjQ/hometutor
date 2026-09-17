@@ -7,7 +7,9 @@ import { createError } from '../lib/errors'
 const loginSchema = z.object({
   code: z.string().min(1),
   role: z.enum(['teacher', 'student']),
-  name: z.string().min(1).optional(),
+  // name 允许空字符串（自动登录场景：旧用户可能没填名字）
+  // 后面 upsert 时兜底为「未命名」
+  name: z.string().optional(),
   // ⚠️ 阶段 1：avatarUrl 可能是 CloudBase fileID（cloud://...），不强制 URL 校验
   // 阶段 3 切 MinIO 后，前端会上传 https URL，那时再加 url() 校验
   avatarUrl: z.string().optional(),
@@ -18,14 +20,17 @@ export default async function (fastify: FastifyInstance) {
   fastify.post('/auth/login', async (req, reply) => {
     const parsed = loginSchema.safeParse(req.body)
     if (!parsed.success) {
+      req.log.warn({ body: req.body, issues: parsed.error.issues }, 'login INVALID_INPUT')
       reply.code(400)
       return {
         success: false,
         error: 'INVALID_INPUT',
         message: parsed.error.message,
+        issues: parsed.error.issues,
       }
     }
     const { code, role, name, avatarUrl, inviteCode } = parsed.data
+    const cleanName = (name && name.trim()) ? name.trim() : '未命名'
 
     // 1. 微信 code → openid
     const { openid } = await code2Session(code)
@@ -64,13 +69,13 @@ export default async function (fastify: FastifyInstance) {
       where: { openid },
       update: {
         role,
-        ...(name && { name }),
+        ...(name && { name: cleanName }),
         ...(avatarUrl && { avatarUrl }),
       },
       create: {
         openid,
         role,
-        name: name ?? '未命名',
+        name: cleanName,
         ...(avatarUrl && { avatarUrl }),
       },
     })
