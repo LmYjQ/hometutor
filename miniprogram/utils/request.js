@@ -1,66 +1,43 @@
 /**
- * 双路径请求封装：
- * - app.globalData.useNasApi === false → 走 wx.cloud.callFunction（云函数，老路径）
- * - app.globalData.useNasApi === true  → 走 wx.request（NAS 后端，新路径）
+ * 严格走 NAS 后端的请求封装。
  *
  * 用法：
  *   const { request } = require('../../utils/request')
  *   const res = await request('/api/auth/login', {
  *     method: 'POST',
+ *     skipAuth: true,
  *     data: { code, role, name, avatarUrl, inviteCode },
  *   })
  *
- * 灰度策略：app.js 里 globalData.useNasApi 控制开关；阶段 1 默认 false
+ * 设计原则：
+ * - 阶段 1+：所有业务接口**只走 NAS 后端**，不再 fallback 到 CloudBase 云函数
+ * - NAS 登录失败就直接报错，**不静默 fallback**
+ * - 视频上传仍走 CloudBase（阶段 1+2 过渡期）：用 uploadToCloud
+ * - 阶段 3 切 MinIO 后：uploadToCloud 也会被替换
  */
 
-const app = getApp()
-
-/**
- * 老路径：把 URL 翻译成云函数名
- *   /api/auth/login          → auth-login
- *   /api/classes/join        → classes-join
- *   /api/assignments/publish → assignments-publish
- */
-function pathToFnName(url) {
-  return url
-    .replace(/^\/api\//, '')
-    .replace(/\//g, '-')
-}
-
-function isWeChatCall(client) {
-  return typeof client === 'object' && typeof client.callFunction === 'function'
+function assertNasMode() {
+  const app = getApp()
+  if (!app || !app.globalData || !app.globalData.apiBase) {
+    throw new Error('NAS API 未初始化：app.js 缺少 apiBase 配置')
+  }
+  // ⚠️ 严格模式：不再支持 useNasApi=false 走 CloudBase 的方式
+  // 阶段 1 起所有业务接口只走 NAS 后端
+  if (app.globalData.useNasApi === false) {
+    throw new Error('NAS API 模式被关闭，请检查 app.js useNasApi 配置（必须为 true）')
+  }
 }
 
 function request(url, options = {}) {
   const { method = 'GET', data, header, timeout = 10000, skipAuth = false } = options || {}
-  const useNas = app && app.globalData && app.globalData.useNasApi
+
+  assertNasMode()
+
+  const app = getApp()
+  const baseUrl = app.globalData.apiBase
   const token = skipAuth ? null : wx.getStorageSync('token')
 
   return new Promise((resolve, reject) => {
-    if (!useNas) {
-      // 老路径：wx.cloud.callFunction（仅支持 POST 风格调用云函数）
-      const fnName = pathToFnName(url)
-      const wxCloud = (typeof wx !== 'undefined' && wx.cloud) ? wx.cloud : null
-      if (!wxCloud) {
-        reject(new Error('wx.cloud 不可用'))
-        return
-      }
-      wxCloud.callFunction({
-        name: fnName,
-        data: data || {},
-        config: { timeout },
-      }).then((res) => {
-        const result = res && res.result
-        if (result && result.success === false && result.error === 'INVALID_TOKEN') {
-          handleAuthFail()
-        }
-        resolve(result)
-      }).catch(reject)
-      return
-    }
-
-    // 新路径：wx.request
-    const baseUrl = app.globalData.apiBase
     wx.request({
       url: baseUrl + url,
       method,
@@ -84,10 +61,9 @@ function request(url, options = {}) {
 }
 
 /**
- * 上传文件（新路径：直接 wx.uploadFile 到后端）
- * 老路径：保留 wx.cloud.uploadFile 不变（头像/视频上传走云存储阶段 1+2 不动）
- *
- * 阶段 3 才切 MinIO，所以这里只暴露 uploadToCloud（wx.cloud.uploadFile 包装）
+ * 上传文件到 CloudBase（仅头像 / 视频文件）
+ * 阶段 1+2：业务接口走 NAS，但 fileID 仍存 CloudBase（NAS submitRecitation 用 fileID 下载）
+ * 阶段 3：切 MinIO 后这个函数也会被替换
  */
 function uploadToCloud(options) {
   return new Promise((resolve, reject) => {
@@ -105,6 +81,8 @@ function uploadToCloud(options) {
 function handleAuthFail() {
   wx.removeStorageSync('token')
   wx.removeStorageSync('userInfo')
+  wx.removeStorageSync('openid')
+  const app = getApp()
   if (app && app.globalData) {
     app.globalData.userInfo = null
     app.globalData.role = null
