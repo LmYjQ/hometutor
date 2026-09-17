@@ -11,10 +11,10 @@
 - [ ] `docker compose up` 起 Postgres + Fastify 容器
 - [ ] `curl http://localhost:3000/health` 返回 `{ok: true}`
 - [ ] Cloudflare Tunnel 状态 HEALTHY
-- [ ] `curl https://api.hometutor.top/health` 返回 `{ok: true}`
+- [ ] `curl https://api.liu1quan.online/health` 返回 `{ok: true}`
 - [ ] Postgres 跑 Prisma migration，6 张表建好
 - [ ] 微信公众平台合法域名已配
-- [ ] `curl https://api.hometutor.top/api/auth/login` 用合法 code 拿到 JWT
+- [ ] `curl https://api.liu1quan.online/api/auth/login` 用合法 code 拿到 JWT
 - [ ] 小程序 `pages/login` 改完调自建后端能登录成功
 - [ ] 全程保留 CloudBase 云函数可调用（灰度开关 `useNasApi = false`）
 
@@ -697,7 +697,7 @@ const fastify = Fastify({
 async function bootstrap() {
   // CORS（小程序不需要，但浏览器调试有用）
   await fastify.register(cors, {
-    origin: ['https://api.hometutor.top'],
+    origin: ['https://api.liu1quan.online'],
     credentials: true,
   })
 
@@ -849,7 +849,7 @@ cloudflared 日志应该看到：
 
 ```bash
 # 在 mac 上
-curl https://api.hometutor.top/health
+curl https://api.liu1quan.online/health
 # {"ok":true,"timestamp":"..."}
 ```
 
@@ -866,7 +866,7 @@ curl https://api.hometutor.top/health
 App({
   globalData: {
     env: 'hometutor-dev-d2gz5nh53c67ecd73',  // 保留原 CloudBase env
-    apiBase: 'https://api.hometutor.top',       // 新 NAS 后端
+    apiBase: 'https://api.liu1quan.online',       // 新 NAS 后端
     useNasApi: false,                            // ⚠️ 灰度开关：阶段 1 默认 false
     userInfo: null,
   },
@@ -1029,7 +1029,7 @@ async onLogin() {
 1. 在开发者工具里点「编译」
 2. 进登录页 → 选角色（老师/学生）→ 选微信头像/昵称 → 点登录
 3. Console 应该看到 `request success`
-4. Network 应该看到 `POST https://api.hometutor.top/api/auth/login` 返回 200
+4. Network 应该看到 `POST https://api.liu1quan.online/api/auth/login` 返回 200
 
 **如果报 `url not in domain list`**：
 

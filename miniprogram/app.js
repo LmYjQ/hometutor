@@ -15,7 +15,7 @@ App({
       // 切到新后端：把 useNasApi 改为 true
       // 出问题立即改回 false 回滚
       useNasApi: false,
-      apiBase: 'https://api.hometutor.top',  // ⚠️ 改成你的 Tunnel 域名
+      apiBase: 'https://api.liu1quan.online',  // ⚠️ 改成你的 Tunnel 域名
     };
     if (!wx.cloud) {
       console.error("请使用 2.2.3 或以上的基础库以使用云能力");

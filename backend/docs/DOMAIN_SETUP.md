@@ -54,7 +54,7 @@
 
 ### 2.2 添加站点
 
-1. 登录后 Dashboard 主页 → 「Add a site」→ 输入你的域名（不带 www，例如 `hometutor.top`）
+1. 登录后 Dashboard 主页 → 「Add a site」→ 输入你的域名（不带 www，例如 `liu1quan.online`）
 2. 选 **Free** 套餐 → 「Continue」
 3. Cloudflare 会自动扫描现有 DNS 记录（腾讯云默认有几条空记录，会被扫出来）
 4. **关键**：Cloudflare 会给你两个 NS 记录，类似：
@@ -83,7 +83,7 @@
 
 - 域名状态会从 `Pending` 变 `Active`
 - **多数情况 10-30 分钟**，最坏 4-24 小时
-- 可以用 `dig NS hometutor.top` 在本地验证（应该看到 cloudflare.com 的 NS）
+- 可以用 `dig NS liu1quan.online` 在本地验证（应该看到 cloudflare.com 的 NS）
 
 生效后 Cloudflare 会邮件通知。
 
@@ -126,14 +126,14 @@
 
    | 字段 | 填什么 | 说明 |
    | --- | --- | --- |
-   | Subdomain | `api` | 你最终访问的是 `api.hometutor.top` |
-   | Domain | `hometutor.top` | 从下拉里选你 Cloudflare 接入的域名 |
+   | Subdomain | `api` | 你最终访问的是 `api.liu1quan.online` |
+   | Domain | `liu1quan.online` | 从下拉里选你 Cloudflare 接入的域名 |
    | Service | `http://api:3000` | ⚠️ `api` 是 docker-compose 里的服务名（不是 localhost）|
    | Path | *留空* | 暂时所有路径都转发 |
 
 4. 点 「**Save hostname**」
 
-> **可选**：再加一个 Public Hostname 给将来的 MinIO（阶段 3 用），比如 `files.hometutor.top` → `http://minio:9000`。
+> **可选**：再加一个 Public Hostname 给将来的 MinIO（阶段 3 用），比如 `files.liu1quan.online` → `http://minio:9000`。
 
 ### 4.2 TLS 模式
 
@@ -162,9 +162,9 @@
 分别填（**不要带尾部斜杠**）：
 
 ```
-request 合法域名:    https://api.hometutor.top
-uploadFile 合法域名:  https://api.hometutor.top
-downloadFile 合法域名: https://api.hometutor.top
+request 合法域名:    https://api.liu1quan.online
+uploadFile 合法域名:  https://api.liu1quan.online
+downloadFile 合法域名: https://api.liu1quan.online
 ```
 
 > 如果你直接用 MinIO 预签名 URL 给小程序上传，还要把 MinIO 域名加进去（阶段 3 再加）。
@@ -350,7 +350,7 @@ CMD ["node", "dist/server.js"]
 ### ✅ 步骤 1：Cloudflare 域名已接管
 
 ```bash
-dig NS hometutor.top
+dig NS liu1quan.online
 ```
 
 应该看到 `cloudflare.com` 的 NS。
@@ -362,7 +362,7 @@ Cloudflare Dashboard → Zero Trust → Networks → Tunnels → `hometutor-nas`
 ### ✅ 步骤 3：DNS 解析
 
 ```bash
-dig api.hometutor.top
+dig api.liu1quan.online
 ```
 
 应该解析到 Cloudflare 的 edge IP（不是 NAS IP）。
@@ -376,7 +376,7 @@ docker logs hometutor-api
 docker logs hometutor-cloudflared
 
 # 本地 mac
-curl -v https://api.hometutor.top/health
+curl -v https://api.liu1quan.online/health
 ```
 
 应该看到 200 + Fastify 响应。
@@ -385,7 +385,7 @@ curl -v https://api.hometutor.top/health
 
 ```bash
 # 在小程序里测试
-wx.request({ url: 'https://api.hometutor.top/health' })
+wx.request({ url: 'https://api.liu1quan.online/health' })
 ```
 
 应该成功返回，不报 `url not in domain list`。
@@ -444,8 +444,8 @@ docker exec hometutor-cloudflared env | grep TUNNEL
 
 ```bash
 # 在不同 DNS 上验证
-nslookup hometutor.top 8.8.8.8
-nslookup hometutor.top 1.1.1.1
+nslookup liu1quan.online 8.8.8.8
+nslookup liu1quan.online 1.1.1.1
 ```
 
 如果 8.8.8.8 已经是 Cloudflare NS 但本地还是老的，**清本地 DNS 缓存**：
