@@ -1,5 +1,3 @@
-npm notice run hometutor-backend@0.1.0 npx
-npm notice run 'prisma' migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script
 -- CreateEnum
 CREATE TYPE "Role" AS ENUM ('teacher', 'student');
 
