@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 用户 ====================
+model User {
+  id        String   @id @default(cuid())
+  openid    String   @unique
+  unionid   String?  @unique
+  role      Role
+  name      String   @default("未命名")
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  taughtClasses    Class[]           @relation("TeacherClasses")
+  classMemberships ClassMember[]
+  authoredBatches  AssignmentBatch[] @relation("TeacherBatches")
+  submissions      Submission[]      @relation("StudentSubmissions")
+
+  @@index([role])
+}
+
+enum Role {
+  teacher
+  student
+}
+
+// ==================== 班级 ====================
+model Class {
+  id          String   @id @default(cuid())
+  teacherId   String
+  teacherName String
+  name        String
+  inviteCode  String   @unique
+  createdAt   DateTime @default(now())
+
+  teacher User             @relation("TeacherClasses", fields: [teacherId], references: [id], onDelete: Cascade)
+  members ClassMember[]
+  batches AssignmentBatch[]
+
+  @@index([teacherId])
+}
+
+model ClassMember {
+  id        String       @id @default(cuid())
+  classId   String
+  studentId String
+  joinedAt  DateTime     @default(now())
+  status    MemberStatus @default(ACTIVE)
+
+  class   Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student User  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, studentId])
+  @@index([studentId])
+}
+
+enum MemberStatus {
+  ACTIVE
+  QUIT
+}
+
+// ==================== 作业批次 ====================
+model AssignmentBatch {
+  id              String      @id @default(cuid())
+  classId         String
+  className       String
+  teacherId       String
+  teacherName     String
+  title           String
+  assignmentCount Int         @default(0)
+  status          BatchStatus @default(ACTIVE)
+  createdAt       DateTime    @default(now())
+  deletedAt       DateTime?
+
+  class       Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacher     User             @relation("TeacherBatches", fields: [teacherId], references: [id])
+  assignments Assignment[]
+
+  @@index([classId, status])
+  @@index([teacherId])
+}
+
+enum BatchStatus {
+  ACTIVE
+  DELETED
+}
+
+// ==================== 作业 ====================
+model Assignment {
+  id            String           @id @default(cuid())
+  batchId       String?
+  classId       String
+  className     String
+  teacherId     String
+  questionTitle String
+  referenceText String           @db.Text
+  deadline      DateTime?
+  status        AssignmentStatus @default(ACTIVE)
+  createdAt     DateTime         @default(now())
+
+  batch       Batch?       @relation(fields: [batchId], references: [id])
+  submissions Submission[]
+
+  @@index([classId, status])
+  @@index([batchId])
+  @@index([teacherId])
+  @@index([deadline])
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  DELETED
+}
+
+// ==================== 提交 ====================
+model Submission {
+  id            String           @id @default(cuid())
+  assignmentId  String
+  studentId     String
+  studentName   String
+  avatarUrl     String?
+  videoFileId   String?
+  audioText     String?          @db.Text
+  score         Int?
+  comment       String?          @db.Text
+  missingPoints String[]
+  status        SubmissionStatus @default(PENDING)
+  createdAt     DateTime         @default(now())
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student    User       @relation("StudentSubmissions", fields: [studentId], references: [id])
+
+  @@index([assignmentId])
+  @@index([studentId])
+  @@index([status])
+}
+
+enum SubmissionStatus {
+  PENDING
+  GRADED
+  FAILED
+}
+
+// ==================== 邀请码 ====================
+model InviteCode {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  isActive  Boolean   @default(true)
+  usedCount Int       @default(0)
+  maxUses   Int       @default(1)
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([code, isActive])
+}

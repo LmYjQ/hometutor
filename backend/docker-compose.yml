@@ -1,0 +1,56 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hometutor-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://hometutor:hometutor_dev@postgres:5432/hometutor
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # ⚠️ 不暴露 3000 端口！只让 cloudflared 内网访问
+    expose:
+      - "3000"
+    networks:
+      - hometutor-net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: hometutor-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hometutor
+      POSTGRES_PASSWORD: hometutor_dev
+      POSTGRES_DB: hometutor
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hometutor -d hometutor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hometutor-net
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: hometutor-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - api
+    networks:
+      - hometutor-net
+
+volumes:
+  pgdata:
+
+networks:
+  hometutor-net:
+    driver: bridge

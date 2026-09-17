@@ -1,5 +1,6 @@
 // pages/login/index.js
 const app = getApp();
+const { request, uploadToCloud } = require('../../utils/request');
 
 Page({
   data: {
@@ -25,22 +26,15 @@ Page({
     if (userInfo && openid && userInfo.role) {
       this.setData({ isLoggingIn: true });
       try {
-        const res = await wx.cloud.callFunction({
-          name: 'login',
-          data: {
-            role: userInfo.role,
-            name: userInfo.name,
-            avatarUrl: userInfo.avatarUrl
-          }
+        const res = await this.doLogin({
+          role: userInfo.role,
+          name: userInfo.name,
+          avatarUrl: userInfo.avatarUrl
         });
 
-        if (res.result.success) {
-          const user = res.result.data;
-          app.globalData.userInfo = user;
-          app.globalData.role = user.role;
-          wx.setStorageSync('userInfo', user);
-          wx.setStorageSync('openid', user._openid);
-          this.navigateToHome(user.role);
+        if (res && res.success && res.data) {
+          this.persistAuth(res.data);
+          this.navigateToHome(res.data.user.role);
           return;
         }
       } catch (e) {
@@ -69,8 +63,6 @@ Page({
   },
 
   // 微信选择头像（button open-type="chooseAvatar" 的回调）
-  // 注意：返回的 avatarUrl 是 wxfile:// 临时路径，必须立刻上传到云存储，
-  // 否则下次冷启动就失效。传失败就让用户重试，不让进 confirmLogin。
   async onChooseAvatar(e) {
     const tempPath = e.detail.avatarUrl;
     if (!tempPath) return;
@@ -89,16 +81,16 @@ Page({
   },
 
   /**
-   * 把本地临时路径上传到云存储，返回永久 fileID
-   * 路径：avatar/<openid>_<timestamp>.jpg（用 openid 防止同名覆盖冲突，
-   *       同一用户再次上传会留下旧文件，不主动删除以避免影响加载）
+   * 上传头像到 CloudBase，返回 fileID
+   * 阶段 1：仍用 wx.cloud.uploadFile（NAS 后端不存头像，仅透传 fileID）
+   * 阶段 3：可改成直传 MinIO
    */
   async uploadAvatar(tempPath) {
     const openid = wx.getStorageSync('openid') || 'anon';
     const ext = (tempPath.match(/\.(\w{2,5})$/) || ['', 'jpg'])[1];
     const cloudPath = `avatar/${openid}_${Date.now()}.${ext}`;
 
-    const res = await wx.cloud.uploadFile({
+    const res = await uploadToCloud({
       cloudPath,
       filePath: tempPath
     });
@@ -144,34 +136,27 @@ Page({
     this.setData({ loading: true });
 
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'login',
-        data: {
-          role: tempRole,
-          name: tempNickName,
-          avatarUrl: tempAvatarUrl,
-          inviteCode: tempInviteCode || ''
-        }
+      const res = await this.doLogin({
+        role: tempRole,
+        name: tempNickName,
+        avatarUrl: tempAvatarUrl,
+        inviteCode: tempInviteCode || ''
       });
 
-      if (res.result.success) {
-        const user = res.result.data;
-        app.globalData.userInfo = user;
-        app.globalData.role = user.role;
-        wx.setStorageSync('userInfo', user);
-        wx.setStorageSync('openid', user._openid);
+      if (res && res.success && res.data) {
+        this.persistAuth(res.data);
 
         wx.showToast({
-          title: user.isNew ? '注册成功' : '登录成功',
+          title: res.data.isNew ? '注册成功' : '登录成功',
           icon: 'success'
         });
 
         setTimeout(() => {
-          this.navigateToHome(user.role);
+          this.navigateToHome(res.data.user.role);
         }, 1500);
       } else {
         wx.showToast({
-          title: res.result.error || '登录失败',
+          title: (res && res.error) || '登录失败',
           icon: 'none'
         });
       }
@@ -180,6 +165,54 @@ Page({
       wx.showToast({ title: '登录失败，请重试', icon: 'none' });
     } finally {
       this.setData({ loading: false });
+    }
+  },
+
+  /**
+   * 登录核心：wx.login() 拿 code，调 request('/api/auth/login')
+   * 双路径都在 utils/request.js 里处理
+   */
+  async doLogin({ role, name, avatarUrl, inviteCode }) {
+    const { code } = await new Promise((resolve, reject) => {
+      wx.login({
+        success: (res) => res.code ? resolve(res) : reject(new Error('wx.login 失败')),
+        fail: reject,
+      })
+    })
+
+    return request('/api/auth/login', {
+      method: 'POST',
+      skipAuth: true,
+      data: {
+        code,
+        role,
+        name,
+        avatarUrl,
+        inviteCode: role === 'teacher' ? inviteCode : undefined,
+      },
+    })
+  },
+
+  /**
+   * 持久化登录态
+   * 老路径（云函数）：user 有 _openid
+   * 新路径（后端）：user 有 openid（且额外有 token）
+   */
+  persistAuth(data) {
+    const user = data.user || {}
+    const useNas = app.globalData.useNasApi
+
+    // 兼容两个字段名（其他页面用 _openid / openid 都有可能）
+    user._openid = user._openid || user.openid
+
+    app.globalData.userInfo = user
+    app.globalData.role = user.role
+    wx.setStorageSync('userInfo', user)
+    wx.setStorageSync('openid', user._openid)
+
+    // 仅 NAS 后端返回 token
+    if (useNas && data.token) {
+      wx.setStorageSync('token', data.token)
     }
   },
 
