@@ -11,10 +11,9 @@ App({
       role: null,
 
       // ============ NAS 自建后端灰度开关 ============
-      // 阶段 1：默认 false（所有请求走云函数老路径）
-      // 切到新后端：把 useNasApi 改为 true
+      // 当前：true（端到端调试中，所有前端接口走 NAS 后端）
       // 出问题立即改回 false 回滚
-      useNasApi: false,
+      useNasApi: true,
       apiBase: 'https://api.liu1quan.online',  // ⚠️ 改成你的 Tunnel 域名
     };
     if (!wx.cloud) {
