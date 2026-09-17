@@ -8,7 +8,9 @@ const loginSchema = z.object({
   code: z.string().min(1),
   role: z.enum(['teacher', 'student']),
   name: z.string().min(1).optional(),
-  avatarUrl: z.string().url().optional(),
+  // ⚠️ 阶段 1：avatarUrl 可能是 CloudBase fileID（cloud://...），不强制 URL 校验
+  // 阶段 3 切 MinIO 后，前端会上传 https URL，那时再加 url() 校验
+  avatarUrl: z.string().optional(),
   inviteCode: z.string().optional(),
 })
 
