@@ -37,7 +37,6 @@
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.7.5",
-    "@types/form-data": "^3.0.0",
     "prisma": "^5.20.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.3"

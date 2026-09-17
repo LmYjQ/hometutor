@@ -105,7 +105,7 @@ model Assignment {
   status        AssignmentStatus @default(ACTIVE)
   createdAt     DateTime         @default(now())
 
-  batch       Batch?       @relation(fields: [batchId], references: [id])
+  batch       AssignmentBatch?       @relation(fields: [batchId], references: [id])
   submissions Submission[]
 
   @@index([classId, status])

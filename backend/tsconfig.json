@@ -16,6 +16,6 @@
     "forceConsistentCasingInFileNames": true,
     "allowJs": false
   },
-  "include": ["src/**/*", "prisma/**/*", "scripts/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -36,7 +36,7 @@ export default async function (fastify: FastifyInstance) {
             message: 'dry run',
             totalLegacy: legacy.length,
             groups: Array.from(groups.entries()).map(([k, v]) => ({
-              key,
+              key: k,
               count: v.length,
             })),
           },
